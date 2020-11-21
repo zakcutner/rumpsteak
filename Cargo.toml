@@ -1,0 +1,35 @@
+[package]
+name = "session"
+version = "0.1.0"
+authors = ["Zak Cutner <me@zakcutner.uk>"]
+edition = "2018"
+description = "Session types for asynchronous communication between multiple parties."
+keywords = ["async", "deadlock", "safety", "session", "types"]
+categories = ["asynchronous", "concurrency"]
+
+[lib]
+bench = false
+
+[[bench]]
+name = "double_buffering"
+harness = false
+
+[[bench]]
+name = "three_adder"
+harness = false
+
+[dependencies]
+futures = "0.3"
+session-macros = { path = "macros" }
+thiserror = "1.0"
+
+[dev-dependencies]
+criterion = "0.3"
+futures = { version = "0.3", features = ["thread-pool"] }
+mpstthree = { git = "https://github.com/NicolasLagaillardie/mpst_rust_github", rev = "ad4983d9" }
+num-complex = "0.3"
+rand = "0.8"
+tokio = { version = "1.0", features = ["macros", "rt", "time"] }
+
+[workspace]
+members = ["macros"]
