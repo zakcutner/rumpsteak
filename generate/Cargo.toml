@@ -1,0 +1,22 @@
+[package]
+name = "session-generate"
+version = "0.1.0"
+authors = ["Zak Cutner <me@zakcutner.uk>"]
+edition = "2018"
+description = "Session types for asynchronous communication between multiple parties."
+keywords = ["async", "deadlock", "safety", "session", "types"]
+categories = ["asynchronous", "concurrency"]
+
+[[bin]]
+name = "session"
+path = "src/main.rs"
+required-features = ["clap"]
+
+[dependencies]
+askama = { git = "https://github.com/djc/askama", rev = "95e346e" }
+clap = { version = "3.0.0-beta", optional = true }
+heck = "0.3"
+indexmap = "1.6"
+pest = "2.1"
+pest_derive = "2.1"
+petgraph = "0.5"

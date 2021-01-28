@@ -32,4 +32,4 @@ rand = "0.8"
 tokio = { version = "1.0", features = ["macros", "rt", "time"] }
 
 [workspace]
-members = ["macros"]
+members = ["generate", "macros"]

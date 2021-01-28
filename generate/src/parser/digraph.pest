@@ -1,0 +1,18 @@
+char = @{ ASCII_ALPHANUMERIC | "_" }
+ident = @{ ASCII_DIGIT+ | (ASCII_ALPHA ~ char*) | ("_" ~ char+) }
+
+send = { "!" }
+receive = { "?" }
+
+parameters = { (ident ~ ",")* ~ ident? }
+label = { ident ~ (send | receive) ~ ident ~ "(" ~ parameters ~ ")"  }
+
+edge = { ident ~ "->" ~ ident ~ "[" ~ "label" ~ "=" ~ "\"" ~ label ~ "\"" ~ ","? ~ "]" }
+node = ${ "\"" ~ ident ~ "\"" | ident }
+
+statement = _{ edge | node }
+statements = { (statement ~ ";")* ~ statement? }
+
+digraph = _{ SOI ~ "digraph" ~ ident ~ "{" ~ statements ~ "}" ~ EOI }
+
+WHITESPACE = _{ " " | "\t" | NEWLINE }
