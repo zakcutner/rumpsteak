@@ -6,7 +6,7 @@ use futures::{
     executor::{self, ThreadPool},
     try_join, SinkExt, Stream, StreamExt,
 };
-use rand::Rng;
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use session::{
     choice::Choice,
     role::{Nil, Role, Roles, Route, ToFrom},
@@ -15,6 +15,8 @@ use session::{
 use std::time::{Duration, Instant};
 
 const VALUES: u64 = 50;
+
+type Seed = <SmallRng as SeedableRng>::Seed;
 
 #[derive(Roles)]
 struct Roles(A, B, S, T);
@@ -135,21 +137,24 @@ where
     .await
 }
 
-fn sleep() {
-    let mut rng = rand::thread_rng();
+fn sleep(mut rng: impl Rng) {
     let duration = Duration::from_micros(rng.gen_range(0..500));
-
     let start = Instant::now();
     while Instant::now() - start < duration {}
 }
 
-async fn source(role: &mut S, mut values: impl Stream<Item = u64> + Unpin) -> Result<()> {
+async fn source(
+    role: &mut S,
+    seed: Seed,
+    mut input: impl Stream<Item = u64> + Unpin,
+) -> Result<()> {
+    let mut rng = SmallRng::from_seed(seed);
     try_session(role, |mut s: Source<'_>| async {
         let s = loop {
             s = {
                 let (Ready, s) = s.receive().await?;
-                sleep();
-                let s = match values.next().await {
+                sleep(&mut rng);
+                let s = match input.next().await {
                     Some(v) => s.select(Copy(v))?,
                     None => {
                         let s = s.select(Stop)?;
@@ -159,8 +164,8 @@ async fn source(role: &mut S, mut values: impl Stream<Item = u64> + Unpin) -> Re
                 };
 
                 let (Ready, s) = s.receive().await?;
-                sleep();
-                match values.next().await {
+                sleep(&mut rng);
+                match input.next().await {
                     Some(v) => s.select(Copy(v))?,
                     None => {
                         let s = s.select(Stop)?;
@@ -176,11 +181,12 @@ async fn source(role: &mut S, mut values: impl Stream<Item = u64> + Unpin) -> Re
     .await
 }
 
-async fn sink(role: &mut T) -> Result<()> {
+async fn sink(role: &mut T, seed: Seed) -> Result<()> {
+    let mut rng = SmallRng::from_seed(seed);
     try_session(role, |mut s: Sink<'_>| async {
         let s = loop {
             s = {
-                sleep();
+                sleep(&mut rng);
                 let s = s.send(Ready)?;
                 let (v, s) = match s.branch().await? {
                     SinkChoice::Stop(Stop, s) => {
@@ -192,7 +198,7 @@ async fn sink(role: &mut T) -> Result<()> {
                 };
                 black_box(v);
 
-                sleep();
+                sleep(&mut rng);
                 let s = s.send(Ready)?;
                 let (v, s) = match s.branch().await? {
                     SinkChoice::Stop(Stop, s) => {
@@ -214,6 +220,9 @@ async fn sink(role: &mut T) -> Result<()> {
 }
 
 pub fn criterion_benchmark(criterion: &mut Criterion) {
+    let mut rng = SmallRng::from_entropy();
+    let seeds = (rng.gen::<Seed>(), rng.gen::<Seed>());
+
     let mut group = criterion.benchmark_group("double_buffering");
     group.throughput(Throughput::Elements(VALUES));
 
@@ -226,8 +235,8 @@ pub fn criterion_benchmark(criterion: &mut Criterion) {
             try_join!(
                 buffer(&mut a),
                 buffer(&mut b),
-                source(&mut s, receiver),
-                sink(&mut t)
+                source(&mut s, seeds.0, receiver),
+                sink(&mut t, seeds.1)
             )
             .unwrap();
         });
@@ -246,8 +255,8 @@ pub fn criterion_benchmark(criterion: &mut Criterion) {
 
         pool.spawn_ok(async move { buffer(&mut a).await.unwrap() });
         pool.spawn_ok(async move { buffer(&mut b).await.unwrap() });
-        pool.spawn_ok(async move { source(&mut s, receiver).await.unwrap() });
-        pool.spawn_ok(async move { sink(&mut t).await.unwrap() });
+        pool.spawn_ok(async move { source(&mut s, seeds.0, receiver).await.unwrap() });
+        pool.spawn_ok(async move { sink(&mut t, seeds.1).await.unwrap() });
 
         bencher.iter(|| {
             let mut sender = sender.clone();
