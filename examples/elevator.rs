@@ -158,7 +158,7 @@ async fn elevator(role: &mut E) -> Result<Never> {
     fn opened<'e>(
         s: ElevatorOpened<'e>,
         mut rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End)>> {
+    ) -> LocalBoxFuture<'e, Result<(Never, End<'_>)>> {
         async move {
             let s = s.send(Reset)?;
             sleep(&mut rng).await;
@@ -176,7 +176,7 @@ async fn elevator(role: &mut E) -> Result<Never> {
     fn opening<'e>(
         s: ElevatorOpening<'e>,
         rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End)>> {
+    ) -> LocalBoxFuture<'e, Result<(Never, End<'_>)>> {
         async move {
             let (DoorOpened, s) = s.send(Open)?.receive().await?;
             opened(s, rng).await
@@ -187,7 +187,7 @@ async fn elevator(role: &mut E) -> Result<Never> {
     fn closed<'e>(
         s: Branch<'e, E, U, ElevatorClosed<'e>>,
         rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End)>> {
+    ) -> LocalBoxFuture<'e, Result<(Never, End<'_>)>> {
         async move {
             match s.branch().await? {
                 ElevatorClosed::CloseDoor(CloseDoor, s) => closed(s, rng).await,
@@ -200,7 +200,7 @@ async fn elevator(role: &mut E) -> Result<Never> {
     fn elevator<'e>(
         s: Elevator<'e>,
         rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End)>> {
+    ) -> LocalBoxFuture<'e, Result<(Never, End<'_>)>> {
         async move {
             let s = s.send(Reset)?;
             closed(s, rng).await

@@ -58,15 +58,16 @@ pub trait IntoSession<'r, R: Role>: Session<'r, R> {
     fn into_session(self) -> Self::Session;
 }
 
-pub struct End {
-    // Prevents consumers from constructing `End` directly.
-    _private: (),
+pub struct End<'r> {
+    phantom: PhantomData<&'r ()>,
 }
 
-impl<R: Role> Session<'_, R> for End {
+impl<'r, R: Role> Session<'r, R> for End<'r> {
     #[inline]
-    fn from_state(_: State<'_, R>) -> Self {
-        Self { _private: () }
+    fn from_state(_: State<'r, R>) -> Self {
+        Self {
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -239,7 +240,7 @@ pub async fn session<'r, R: Role, S: Session<'r, R>, T, F>(
     f: impl FnOnce(S) -> F,
 ) -> T
 where
-    F: Future<Output = (T, End)>,
+    F: Future<Output = (T, End<'r>)>,
 {
     let output = try_session(role, |s| f(s).map(Ok)).await;
     output.unwrap_or_else(|infallible: Infallible| match infallible {})
@@ -251,7 +252,7 @@ pub async fn try_session<'r, R: Role, S: Session<'r, R>, T, E, F>(
     f: impl FnOnce(S) -> F,
 ) -> Result<T, E>
 where
-    F: Future<Output = Result<(T, End), E>>,
+    F: Future<Output = Result<(T, End<'r>), E>>,
 {
     let state = State(role);
     f(state.into_session()).await.map(|(output, _)| output)

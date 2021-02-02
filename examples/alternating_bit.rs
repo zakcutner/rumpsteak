@@ -42,7 +42,7 @@ enum SenderChoice0<'s> {
 #[role('s, S)]
 enum SenderChoice1<'s> {
     A0(A0, Send<'s, S, R, D1, Branch<'s, S, R, SenderChoice1<'s>>>),
-    A1(A1, End),
+    A1(A1, End<'s>),
 }
 
 type Receiver<'r> = Branch<'r, R, S, ReceiverChoice0<'r>>;
@@ -61,7 +61,7 @@ enum ReceiverChoice0<'r> {
 enum ReceiverChoice1<'r> {
     #[rustfmt::skip]
     D0(D0, Send<'r, R, S, A0, Branch<'r, R, S, ReceiverChoice1<'r>>>),
-    D1(D1, Send<'r, R, S, A1, End>),
+    D1(D1, Send<'r, R, S, A1, End<'r>>),
 }
 
 async fn sender(role: &mut S, input: (i32, i32)) -> Result<()> {

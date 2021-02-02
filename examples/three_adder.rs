@@ -29,15 +29,15 @@ struct Add(i32);
 struct Sum(i32);
 
 #[rustfmt::skip]
-type AdderA<'a> = Send<'a, A, B, Add, Receive<'a, A, B, Add, Send<'a, A, C, Add, Receive<'a, A, C, Sum, End>>>>;
+type AdderA<'a> = Send<'a, A, B, Add, Receive<'a, A, B, Add, Send<'a, A, C, Add, Receive<'a, A, C, Sum, End<'a>>>>>;
 
 #[rustfmt::skip]
-type AdderB<'b> = Receive<'b, B, A, Add, Send<'b, B, A, Add, Send<'b, B, C, Add, Receive<'b, B, C, Sum, End>>>>;
+type AdderB<'b> = Receive<'b, B, A, Add, Send<'b, B, A, Add, Send<'b, B, C, Add, Receive<'b, B, C, Sum, End<'b>>>>>;
 
 #[rustfmt::skip]
-type AdderC<'c> = Receive<'c, C, A, Add, Receive<'c, C, B, Add, Send<'c, C, A, Sum, Send<'c, C, B, Sum, End>>>>;
+type AdderC<'c> = Receive<'c, C, A, Add, Receive<'c, C, B, Add, Send<'c, C, A, Sum, Send<'c, C, B, Sum, End<'c>>>>>;
 
-async fn adder_a(s: AdderA<'_>) -> Result<((), End)> {
+async fn adder_a(s: AdderA<'_>) -> Result<((), End<'_>)> {
     let x = 2;
     let s = s.send(Add(x))?;
     let (Add(y), s) = s.receive().await?;
@@ -48,7 +48,7 @@ async fn adder_a(s: AdderA<'_>) -> Result<((), End)> {
     Ok(((), s))
 }
 
-async fn adder_b(s: AdderB<'_>) -> Result<((), End)> {
+async fn adder_b(s: AdderB<'_>) -> Result<((), End<'_>)> {
     let (Add(y), s) = s.receive().await?;
     let x = 3;
     let s = s.send(Add(x))?;
@@ -59,7 +59,7 @@ async fn adder_b(s: AdderB<'_>) -> Result<((), End)> {
     Ok(((), s))
 }
 
-async fn adder_c(s: AdderC<'_>) -> Result<((), End)> {
+async fn adder_c(s: AdderC<'_>) -> Result<((), End<'_>)> {
     let (Add(x), s) = s.receive().await?;
     let (Add(y), s) = s.receive().await?;
     let z = x + y;

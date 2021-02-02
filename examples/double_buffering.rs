@@ -68,7 +68,8 @@ where
     S: Route<R, Route = ToFrom<R>>,
     T: Route<R, Route = ToFrom<R>>,
 {
-    Stop(Stop, Receive<'r, R, T, Ready, Send<'r, R, T, Stop, End>>),
+    #[rustfmt::skip]
+    Stop(Stop, Receive<'r, R, T, Ready, Send<'r, R, T, Stop, End<'r>>>),
     #[rustfmt::skip]
     Copy(Copy, Receive<'r, R, T, Ready, Send<'r, R, T, Copy, Buffer<'r, R>>>),
 }
@@ -84,7 +85,8 @@ where
     R: Route<S, Route = ToFrom<S>> + Role<Message = Message>,
     S: Route<Q, Route = ToFrom<Q>> + Route<R, Route = ToFrom<R>>,
 {
-    Stop(Stop, Receive<'s, S, Q, Ready, Send<'s, S, Q, Stop, End>>),
+    #[rustfmt::skip]
+    Stop(Stop, Receive<'s, S, Q, Ready, Send<'s, S, Q, Stop, End<'s>>>),
     #[rustfmt::skip]
     Copy(Copy, Receive<'s, S, Q, Ready, Select<'s, S, Q, SourceChoice<'s, R, Q>>>),
 }
@@ -100,7 +102,8 @@ where
     R: Route<T, Route = ToFrom<T>> + Role<Message = Message>,
     T: Route<Q, Route = ToFrom<Q>> + Route<R, Route = ToFrom<R>>,
 {
-    Stop(Stop, Send<'t, T, Q, Ready, Receive<'t, T, Q, Stop, End>>),
+    #[rustfmt::skip]
+    Stop(Stop, Send<'t, T, Q, Ready, Receive<'t, T, Q, Stop, End<'t>>>),
     #[rustfmt::skip]
     Copy(Copy, Send<'t, T, Q, Ready, Branch<'t, T, Q, SinkChoice<'t, R, Q>>>),
 }

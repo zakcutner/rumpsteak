@@ -116,7 +116,7 @@ enum Message {
 struct Value(Complex32);
 
 #[rustfmt::skip]
-type Process<'q, Q, R, S, T> = Send<'q, Q, R, Value, Receive<'q, Q, R, Value, Send<'q, Q, S, Value, Receive<'q, Q, S, Value, Send<'q, Q, T, Value, Receive<'q, Q, T, Value, End>>>>>>;
+type Process<'q, Q, R, S, T> = Send<'q, Q, R, Value, Receive<'q, Q, R, Value, Send<'q, Q, S, Value, Receive<'q, Q, S, Value, Send<'q, Q, T, Value, Receive<'q, Q, T, Value, End<'q>>>>>>>;
 
 async fn process<Q, R, S, T>(role: &mut Q, i: usize, input: Complex32) -> Result<Complex32>
 where

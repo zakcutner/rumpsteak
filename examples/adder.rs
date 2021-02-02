@@ -38,7 +38,7 @@ type Client<'c> = Send<'c, C, S, Hello, Select<'c, C, S, ClientChoice<'c>>>;
 enum ClientChoice<'c> {
     #[rustfmt::skip]
     Add(Add, Send<'c, C, S, Add, Receive<'c, C, S, Sum, Select<'c, C, S, ClientChoice<'c>>>>),
-    Bye(Bye, Receive<'c, C, S, Bye, End>),
+    Bye(Bye, Receive<'c, C, S, Bye, End<'c>>),
 }
 
 type Server<'s> = Receive<'s, S, C, Hello, Branch<'s, S, C, ServerChoice<'s>>>;
@@ -48,10 +48,10 @@ type Server<'s> = Receive<'s, S, C, Hello, Branch<'s, S, C, ServerChoice<'s>>>;
 enum ServerChoice<'s> {
     #[rustfmt::skip]
     Add(Add, Receive<'s, S, C, Add, Send<'s, S, C, Sum, Branch<'s, S, C, ServerChoice<'s>>>>),
-    Bye(Bye, Send<'s, S, C, Bye, End>),
+    Bye(Bye, Send<'s, S, C, Bye, End<'s>>),
 }
 
-async fn client(s: Client<'_>) -> Result<((), End)> {
+async fn client(s: Client<'_>) -> Result<((), End<'_>)> {
     let s = s.send(Hello(1))?;
 
     let s = s.select(Add(2))?;
@@ -78,7 +78,7 @@ async fn client(s: Client<'_>) -> Result<((), End)> {
     Ok(((), s))
 }
 
-async fn server(s: Server<'_>) -> Result<((), End)> {
+async fn server(s: Server<'_>) -> Result<((), End<'_>)> {
     let (Hello(u), mut s) = s.receive().await?;
     let s = loop {
         s = match s.branch().await? {

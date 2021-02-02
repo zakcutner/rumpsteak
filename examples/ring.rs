@@ -24,13 +24,13 @@ enum Message {
     Value(i32),
 }
 
-type RingA<'a> = Send<'a, A, B, i32, Receive<'a, A, C, i32, End>>;
+type RingA<'a> = Send<'a, A, B, i32, Receive<'a, A, C, i32, End<'a>>>;
 
-type RingB<'b> = Receive<'b, B, A, i32, Send<'b, B, C, i32, End>>;
+type RingB<'b> = Receive<'b, B, A, i32, Send<'b, B, C, i32, End<'b>>>;
 
-type RingC<'c> = Receive<'c, C, B, i32, Send<'c, C, A, i32, End>>;
+type RingC<'c> = Receive<'c, C, B, i32, Send<'c, C, A, i32, End<'c>>>;
 
-async fn ring_a(s: RingA<'_>) -> Result<((), End)> {
+async fn ring_a(s: RingA<'_>) -> Result<((), End<'_>)> {
     let input = 10;
     println!("input = {}", input);
 
@@ -43,12 +43,12 @@ async fn ring_a(s: RingA<'_>) -> Result<((), End)> {
     Ok(((), s))
 }
 
-async fn ring_b(s: RingB<'_>) -> Result<((), End)> {
+async fn ring_b(s: RingB<'_>) -> Result<((), End<'_>)> {
     let (input, s) = s.receive().await?;
     Ok(((), s.send(input.pow(2))?))
 }
 
-async fn ring_c(s: RingC<'_>) -> Result<((), End)> {
+async fn ring_c(s: RingC<'_>) -> Result<((), End<'_>)> {
     let (input, s) = s.receive().await?;
     Ok(((), s.send(input * 2)?))
 }
