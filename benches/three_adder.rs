@@ -106,11 +106,10 @@ pub fn criterion_benchmark(criterion: &mut Criterion) {
     blocking_oneshot::criterion_benchmark(criterion);
 }
 
-#[allow(deprecated)]
 mod oneshot {
     use criterion::Criterion;
     use futures::executor;
-    use session::oneshot::{session3, End, Left, Receive, Right, Send, SessionPair};
+    use session_oneshot::{session3, End, Left, Receive, Right, Send, SessionPair};
 
     type AdderAToB = Send<i32, Receive<i32, End>>;
     type AdderAToC = Send<i32, Receive<i32, End>>;

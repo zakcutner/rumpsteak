@@ -2,9 +2,6 @@ pub mod channel;
 pub mod choice;
 pub mod role;
 
-#[deprecated]
-pub mod oneshot;
-
 pub use self::channel::SendError;
 pub use session_macros::{IntoSession, Label};
 
