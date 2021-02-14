@@ -5,198 +5,83 @@ use futures::{
     try_join, FutureExt,
 };
 use session::{
-    choice::Choice,
-    role::{Nil, Role, Roles, Route, ToFrom},
-    try_session, Branch, End, Label, Receive, Result, Select, Send,
+    role::{Nil, Role, Roles, ToFrom},
+    try_session, End, Label, Receive, Result, Send,
 };
 use std::{future::Future, marker};
 
 #[derive(Roles)]
-struct Roles(A, B, S, T);
+struct Roles(S, K, T);
 
 #[derive(Role)]
 #[message(Message)]
-struct A(
-    #[route(B)] Nil<B>,
-    #[route(S)] ToFrom<S>,
-    #[route(T)] ToFrom<T>,
-);
+struct S(#[route(K)] ToFrom<K>, #[route(T)] Nil<T>);
 
 #[derive(Role)]
 #[message(Message)]
-struct B(
-    #[route(A)] Nil<A>,
-    #[route(S)] ToFrom<S>,
-    #[route(T)] ToFrom<T>,
-);
+struct K(#[route(S)] ToFrom<S>, #[route(T)] ToFrom<T>);
 
 #[derive(Role)]
 #[message(Message)]
-struct S(
-    #[route(A)] ToFrom<A>,
-    #[route(B)] ToFrom<B>,
-    #[route(T)] Nil<T>,
-);
-
-#[derive(Role)]
-#[message(Message)]
-struct T(
-    #[route(A)] ToFrom<A>,
-    #[route(B)] ToFrom<B>,
-    #[route(S)] Nil<S>,
-);
+struct T(#[route(S)] Nil<S>, #[route(K)] ToFrom<K>);
 
 #[derive(Label)]
 enum Message {
     Ready(Ready),
-    Stop(Stop),
     Copy(Copy),
 }
 
 struct Ready;
-struct Stop;
 struct Copy(i32);
 
 #[rustfmt::skip]
-type Buffer<'r, R> = Send<'r, R, S, Ready, Branch<'r, R, S, BufferChoice<'r, R>>>;
-
-#[derive(Choice)]
-#[role('r, R)]
-enum BufferChoice<'r, R>
-where
-    R: Route<S, Route = ToFrom<S>> + Route<T, Route = ToFrom<T>> + Role<Message = Message>,
-    S: Route<R, Route = ToFrom<R>>,
-    T: Route<R, Route = ToFrom<R>>,
-{
-    #[rustfmt::skip]
-    Stop(Stop, Receive<'r, R, T, Ready, Send<'r, R, T, Stop, End<'r>>>),
-    #[rustfmt::skip]
-    Copy(Copy, Receive<'r, R, T, Ready, Send<'r, R, T, Copy, Buffer<'r, R>>>),
-}
+type Source<'s> = Receive<'s, S, K, Ready, Send<'s, S, K, Copy, Receive<'s, S, K, Ready, Send<'s, S, K, Copy, End<'s>>>>>;
 
 #[rustfmt::skip]
-type Source<'s> = Receive<'s, S, A, Ready, Select<'s, S, A, SourceChoice<'s, B, A>>>;
-
-#[derive(Choice)]
-#[role('s, S)]
-enum SourceChoice<'s, Q, R>
-where
-    Q: Route<S, Route = ToFrom<S>> + Role<Message = Message>,
-    R: Route<S, Route = ToFrom<S>> + Role<Message = Message>,
-    S: Route<Q, Route = ToFrom<Q>> + Route<R, Route = ToFrom<R>>,
-{
-    #[rustfmt::skip]
-    Stop(Stop, Receive<'s, S, Q, Ready, Send<'s, S, Q, Stop, End<'s>>>),
-    #[rustfmt::skip]
-    Copy(Copy, Receive<'s, S, Q, Ready, Select<'s, S, Q, SourceChoice<'s, R, Q>>>),
-}
+type Kernel<'k> = Send<'k, K, S, Ready, Receive<'k, K, S, Copy, Receive<'k, K, T, Ready, Send<'k, K, T, Copy, Send<'k, K, S, Ready, Receive<'k, K, S, Copy, Receive<'k, K, T, Ready, Send<'k, K, T, Copy, End<'k>>>>>>>>>;
 
 #[rustfmt::skip]
-type Sink<'t> = Send<'t, T, A, Ready, Branch<'t, T, A, SinkChoice<'t, B, A>>>;
+type Sink<'t> = Send<'t, T, K, Ready, Receive<'t, T, K, Copy, Send<'t, T, K, Ready, Receive<'t, T, K, Copy, End<'t>>>>>;
 
-#[derive(Choice)]
-#[role('t, T)]
-enum SinkChoice<'t, Q, R>
-where
-    Q: Route<T, Route = ToFrom<T>> + Role<Message = Message>,
-    R: Route<T, Route = ToFrom<T>> + Role<Message = Message>,
-    T: Route<Q, Route = ToFrom<Q>> + Route<R, Route = ToFrom<R>>,
-{
-    #[rustfmt::skip]
-    Stop(Stop, Send<'t, T, Q, Ready, Receive<'t, T, Q, Stop, End<'t>>>),
-    #[rustfmt::skip]
-    Copy(Copy, Send<'t, T, Q, Ready, Branch<'t, T, Q, SinkChoice<'t, R, Q>>>),
-}
+async fn source(role: &mut S, input: (i32, i32)) -> Result<()> {
+    try_session(role, |s: Source<'_>| async {
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(input.0))?;
 
-async fn buffer<R>(role: &mut R) -> Result<()>
-where
-    R: Route<S, Route = ToFrom<S>> + Route<T, Route = ToFrom<T>> + Role<Message = Message>,
-    S: Route<R, Route = ToFrom<R>>,
-    T: Route<R, Route = ToFrom<R>>,
-{
-    try_session(role, |mut s: Buffer<'_, R>| async {
-        let s = loop {
-            s = match s.send(Ready)?.branch().await? {
-                BufferChoice::Stop(Stop, s) => {
-                    let (Ready, s) = s.receive().await?;
-                    break s.send(Stop)?;
-                }
-                BufferChoice::Copy(Copy(v), s) => {
-                    let (Ready, s) = s.receive().await?;
-                    s.send(Copy(v))?
-                }
-            };
-        };
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(input.1))?;
 
         Ok(((), s))
     })
     .await
 }
 
-async fn source(role: &mut S, values: &[i32]) -> Result<()> {
-    try_session(role, |mut s: Source<'_>| async {
-        let mut values = values.iter();
-        let s = loop {
-            s = {
-                let (Ready, s) = s.receive().await?;
-                let s = match values.next() {
-                    Some(&v) => s.select(Copy(v))?,
-                    None => {
-                        let s = s.select(Stop)?;
-                        let (Ready, s) = s.receive().await?;
-                        break s.send(Stop)?;
-                    }
-                };
+async fn kernel(role: &mut K) -> Result<()> {
+    try_session(role, |s: Kernel<'_>| async {
+        let s = s.send(Ready)?;
+        let (Copy(x), s) = s.receive().await?;
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(x))?;
 
-                let (Ready, s) = s.receive().await?;
-                match values.next() {
-                    Some(&v) => s.select(Copy(v))?,
-                    None => {
-                        let s = s.select(Stop)?;
-                        let (Ready, s) = s.receive().await?;
-                        break s.send(Stop)?;
-                    }
-                }
-            };
-        };
+        let s = s.send(Ready)?;
+        let (Copy(y), s) = s.receive().await?;
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(y))?;
 
         Ok(((), s))
     })
     .await
 }
 
-async fn sink(role: &mut T) -> Result<Vec<i32>> {
-    try_session(role, |mut s: Sink<'_>| async {
-        let mut values = vec![];
-        Ok(loop {
-            s = {
-                let s = s.send(Ready)?;
-                let s = match s.branch().await? {
-                    SinkChoice::Stop(Stop, s) => {
-                        let s = s.send(Ready)?;
-                        let (Stop, s) = s.receive().await?;
-                        break (values, s);
-                    }
-                    SinkChoice::Copy(Copy(v), s) => {
-                        values.push(v);
-                        s
-                    }
-                };
+async fn sink(role: &mut T) -> Result<(i32, i32)> {
+    try_session(role, |s: Sink<'_>| async {
+        let s = s.send(Ready)?;
+        let (Copy(x), s) = s.receive().await?;
 
-                let s = s.send(Ready)?;
-                match s.branch().await? {
-                    SinkChoice::Stop(Stop, s) => {
-                        let s = s.send(Ready)?;
-                        let (Stop, s) = s.receive().await?;
-                        break (values, s);
-                    }
-                    SinkChoice::Copy(Copy(v), s) => {
-                        values.push(v);
-                        s
-                    }
-                }
-            };
-        })
+        let s = s.send(Ready)?;
+        let (Copy(y), s) = s.receive().await?;
+
+        Ok(((x, y), s))
     })
     .await
 }
@@ -211,22 +96,21 @@ where
 }
 
 fn main() {
-    let Roles(mut a, mut b, mut s, mut t) = Roles::default();
+    let Roles(mut s, mut k, mut t) = Roles::default();
     let pool = ThreadPool::new().unwrap();
 
-    let input = &[1, 2, 3, 4, 5];
+    let input = (1, 2);
     println!("input = {:?}", input);
 
-    let (_, _, _, output) = executor::block_on(async {
+    let (_, _, output) = executor::block_on(async {
         try_join!(
-            spawn(&pool, async move { buffer(&mut a).await }),
-            spawn(&pool, async move { buffer(&mut b).await }),
             spawn(&pool, async move { source(&mut s, input).await }),
+            spawn(&pool, async move { kernel(&mut k).await }),
             spawn(&pool, async move { sink(&mut t).await }),
         )
         .unwrap()
     });
 
     println!("output = {:?}", output);
-    assert_eq!(input, output.as_slice());
+    assert_eq!(input, output);
 }
