@@ -29,13 +29,13 @@ pub fn into_session(input: TokenStream) -> Result<TokenStream> {
     };
 
     Ok(quote! {
-        impl #impl_generics ::session::Session<#role> for #ident #ty_generics #where_clause {
-            fn from_state(state: ::session::State<#role>) -> Self {
-                Self { #field_ident: ::session::Session::from_state(state) }
+        impl #impl_generics ::rumpsteak::Session<#role> for #ident #ty_generics #where_clause {
+            fn from_state(state: ::rumpsteak::State<#role>) -> Self {
+                Self { #field_ident: ::rumpsteak::Session::from_state(state) }
             }
         }
 
-        impl #impl_generics ::session::IntoSession<#role> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::rumpsteak::IntoSession<#role> for #ident #ty_generics #where_clause {
             type Session = #field_ty;
 
             fn into_session(self) -> Self::Session {

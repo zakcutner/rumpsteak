@@ -1,5 +1,5 @@
 [package]
-name = "session"
+name = "rumpsteak"
 version = "0.1.0"
 authors = ["Zak Cutner <me@zakcutner.uk>"]
 edition = "2018"
@@ -20,7 +20,7 @@ harness = false
 
 [dependencies]
 futures = "0.3"
-session-macros = { path = "macros" }
+rumpsteak-macros = { path = "macros" }
 thiserror = "1.0"
 
 [dev-dependencies]
@@ -29,7 +29,7 @@ futures = { version = "0.3", features = ["thread-pool"] }
 mpstthree = { git = "https://github.com/NicolasLagaillardie/mpst_rust_github", rev = "ad4983d9" }
 num-complex = "0.3"
 rand = { version = "0.8", features = ["small_rng"] }
-session-oneshot = { path = "oneshot" }
+rumpsteak-oneshot = { path = "oneshot" }
 tokio = { version = "1.0", features = ["macros", "rt", "time"] }
 
 [workspace]

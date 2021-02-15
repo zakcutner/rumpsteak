@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use ::session::{
+use ::rumpsteak::{
     choice::Choice,
     role::{Role, Roles, ToFrom},
     Branch, End, IntoSession, Label, Receive, Select, Send,

@@ -2,7 +2,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use futures::{executor, try_join};
-use session::{
+use rumpsteak::{
     role::{Role, Roles, ToFrom},
     try_session, End, Label, Receive, Result, Send,
 };
@@ -109,7 +109,7 @@ pub fn criterion_benchmark(criterion: &mut Criterion) {
 mod oneshot {
     use criterion::Criterion;
     use futures::executor;
-    use session_oneshot::{session3, End, Left, Receive, Right, Send, SessionPair};
+    use rumpsteak_oneshot::{session3, End, Left, Receive, Right, Send, SessionPair};
 
     type AdderAToB = Send<i32, Receive<i32, End>>;
     type AdderAToC = Send<i32, Receive<i32, End>>;

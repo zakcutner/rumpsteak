@@ -1,4 +1,4 @@
-pub use session_macros::{Role, Roles};
+pub use rumpsteak_macros::{Role, Roles};
 
 use crate::channel;
 use std::marker::PhantomData;

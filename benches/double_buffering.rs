@@ -2,7 +2,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use futures::{executor, try_join};
-use session::{
+use rumpsteak::{
     role::{Nil, Role, Roles, ToFrom},
     try_session, End, Label, Receive, Result, Send,
 };

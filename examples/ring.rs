@@ -1,5 +1,5 @@
 use futures::{executor, try_join};
-use session::{
+use rumpsteak::{
     role::{From, Role, Roles, To},
     try_session, End, Label, Receive, Result, Send,
 };

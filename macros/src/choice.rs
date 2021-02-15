@@ -37,7 +37,7 @@ pub fn choice(input: TokenStream) -> Result<TokenStream> {
         }?;
 
         output.extend(quote! {
-            impl #impl_generics ::session::choice::Internal<#role, #label> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::rumpsteak::choice::Internal<#role, #label> for #ident #ty_generics #where_clause {
                 type Session = #session;
             }
         });
@@ -45,12 +45,12 @@ pub fn choice(input: TokenStream) -> Result<TokenStream> {
 
     let idents = variants.iter().map(|variant| &variant.ident);
     output.extend(quote! {
-        impl #impl_generics ::session::choice::External<#role> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::rumpsteak::choice::External<#role> for #ident #ty_generics #where_clause {
             fn choice(
-                state: ::session::State<#role>,
-                message: <#role_ty as ::session::role::Role>::Message
+                state: ::rumpsteak::State<#role>,
+                message: <#role_ty as ::rumpsteak::role::Role>::Message
             ) -> Option<Self> {
-                type Message<R> = <R as ::session::role::Role>::Message;
+                type Message<R> = <R as ::rumpsteak::role::Role>::Message;
 
                 match message {
                     #(Message::<#role_ty>::#idents(label) => Some(Self::#idents(label, state.into_session())),)*

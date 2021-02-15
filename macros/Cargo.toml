@@ -1,5 +1,5 @@
 [package]
-name = "session-macros"
+name = "rumpsteak-macros"
 version = "0.1.0"
 authors = ["Zak Cutner <me@zakcutner.uk>"]
 edition = "2018"

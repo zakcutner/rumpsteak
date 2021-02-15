@@ -1,5 +1,5 @@
 [package]
-name = "session-generate"
+name = "rumpsteak-generate"
 version = "0.1.0"
 authors = ["Zak Cutner <me@zakcutner.uk>"]
 edition = "2018"
@@ -8,8 +8,7 @@ keywords = ["async", "deadlock", "safety", "session", "types"]
 categories = ["asynchronous", "concurrency"]
 
 [[bin]]
-name = "session"
-path = "src/main.rs"
+name = "rumpsteak-generate"
 required-features = ["clap"]
 
 [dependencies]

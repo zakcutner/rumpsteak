@@ -1,6 +1,6 @@
 use futures::{future::LocalBoxFuture, FutureExt};
 use rand::Rng;
-use session::{
+use rumpsteak::{
     choice::Choice,
     role::{Role, Roles, ToFrom},
     try_session, Branch, End, Label, Receive, Result, Select, Send,

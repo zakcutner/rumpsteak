@@ -32,7 +32,7 @@ pub fn label(input: TokenStream) -> Result<TokenStream> {
 
         let ty = &field.ty;
         output.extend(quote! {
-            impl #impl_generics ::session::Label<#ty> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::rumpsteak::Label<#ty> for #ident #ty_generics #where_clause {
                 fn wrap(label: #ty) -> Self {
                     Self::#variant_ident(label)
                 }

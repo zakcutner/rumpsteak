@@ -1,6 +1,6 @@
 use futures::{executor, try_join};
 use num_complex::{Complex, Complex32};
-use session::{
+use rumpsteak::{
     role::{Nil, Role, Roles, Route, ToFrom},
     try_session, End, Label, Receive, Result, Send,
 };

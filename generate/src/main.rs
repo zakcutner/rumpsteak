@@ -1,9 +1,9 @@
 use clap::Clap;
-use session_generate::Builder;
+use rumpsteak_generate::Builder;
 use std::{error::Error, fs::File, io::Write, process::exit};
 
 #[derive(Clap)]
-#[clap(name = "session", version, author, about)]
+#[clap(version, author, about)]
 struct Arguments {
     /// Sets the name of the protocol.
     #[clap(short, long)]

@@ -1,4 +1,4 @@
-pub use session_macros::Choice;
+pub use rumpsteak_macros::Choice;
 
 use crate::{role::Role, Label, Session, State};
 

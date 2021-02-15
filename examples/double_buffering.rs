@@ -4,7 +4,7 @@ use futures::{
     executor::{self, ThreadPool},
     try_join, FutureExt,
 };
-use session::{
+use rumpsteak::{
     role::{Nil, Role, Roles, ToFrom},
     try_session, End, Label, Receive, Result, Send,
 };

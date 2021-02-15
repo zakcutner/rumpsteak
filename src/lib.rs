@@ -3,7 +3,7 @@ pub mod choice;
 pub mod role;
 
 pub use self::channel::SendError;
-pub use session_macros::{IntoSession, Label};
+pub use rumpsteak_macros::{IntoSession, Label};
 
 use self::{
     choice::{External, Internal},
