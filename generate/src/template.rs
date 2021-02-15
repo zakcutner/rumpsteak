@@ -31,7 +31,7 @@ struct TypeFormatter<'a> {
 impl<'a> TypeFormatter<'a> {
     fn with(&self, ty: &'a Type) -> Self {
         Self {
-            ty: ty,
+            ty,
             name: self.name,
             role: self.role,
             roles: self.roles,
@@ -123,10 +123,12 @@ mod filters {
     use super::{Label, Role, Type, TypeFormatter};
     use askama::Result;
 
+    #[allow(clippy::unnecessary_wraps)]
     pub(super) fn copy_bool(t: &bool) -> Result<bool> {
         Ok(*t)
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     pub(super) fn ty<'a>(
         ty: &'a Type,
         name: &'a str,
