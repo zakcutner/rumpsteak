@@ -17,6 +17,10 @@ name = "double_buffering"
 harness = false
 
 [[bench]]
+name = "ring"
+harness = false
+
+[[bench]]
 name = "three_adder"
 harness = false
 
