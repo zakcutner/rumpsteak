@@ -21,46 +21,63 @@ struct C(#[route(A)] To<A>, #[route(B)] From<B>);
 
 #[derive(Label)]
 enum Message {
-    Value(i32),
+    Value(Value),
 }
 
-type RingA<'a> = Send<'a, A, B, i32, Receive<'a, A, C, i32, End<'a>>>;
+struct Value(i32);
 
-type RingB<'b> = Receive<'b, B, A, i32, Send<'b, B, C, i32, End<'b>>>;
+#[rustfmt::skip]
+type RingA<'a> = Send<'a, A, B, Value, Receive<'a, A, C, Value, End<'a>>>;
 
-type RingC<'c> = Receive<'c, C, B, i32, Send<'c, C, A, i32, End<'c>>>;
+#[rustfmt::skip]
+type RingB<'b> = Receive<'b, B, A, Value, Send<'b, B, C, Value, End<'b>>>;
 
-async fn ring_a(s: RingA<'_>) -> Result<((), End<'_>)> {
-    let input = 10;
-    println!("input = {}", input);
+#[rustfmt::skip]
+type RingC<'c> = Receive<'c, C, B, Value, Send<'c, C, A, Value, End<'c>>>;
 
-    let s = s.send(input)?;
-    let (output, s) = s.receive().await?;
-
-    println!("output = {}", output);
-    assert_eq!(input.pow(2) * 2, output);
-
-    Ok(((), s))
+async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
+    let x = input;
+    try_session(role, |s: RingA<'_>| async {
+        let s = s.send(Value(x))?;
+        let (Value(y), s) = s.receive().await?;
+        Ok((x + y, s))
+    })
+    .await
 }
 
-async fn ring_b(s: RingB<'_>) -> Result<((), End<'_>)> {
-    let (input, s) = s.receive().await?;
-    Ok(((), s.send(input.pow(2))?))
+async fn ring_b(role: &mut B, input: i32) -> Result<i32> {
+    let x = input;
+    try_session(role, |s: RingB<'_>| async {
+        let (Value(y), s) = s.receive().await?;
+        let s = s.send(Value(x))?;
+        Ok((x + y, s))
+    })
+    .await
 }
 
-async fn ring_c(s: RingC<'_>) -> Result<((), End<'_>)> {
-    let (input, s) = s.receive().await?;
-    Ok(((), s.send(input * 2)?))
+async fn ring_c(role: &mut C, input: i32) -> Result<i32> {
+    let x = input;
+    try_session(role, |s: RingC<'_>| async {
+        let (Value(y), s) = s.receive().await?;
+        let s = s.send(Value(x))?;
+        Ok((x + y, s))
+    })
+    .await
 }
 
 fn main() {
     let Roles(mut a, mut b, mut c) = Roles::default();
-    executor::block_on(async {
+
+    let input = (1, 2, 3);
+    println!("input = {:?}", input);
+
+    let output = executor::block_on(async {
         try_join!(
-            try_session(&mut a, ring_a),
-            try_session(&mut b, ring_b),
-            try_session(&mut c, ring_c),
+            ring_a(&mut a, input.0),
+            ring_b(&mut b, input.1),
+            ring_c(&mut c, input.2),
         )
-        .unwrap();
+        .unwrap()
     });
+    println!("output = {:?}", output);
 }
