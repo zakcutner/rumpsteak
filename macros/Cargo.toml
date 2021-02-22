@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Zak Cutner <me@zakcutner.uk>"]
 edition = "2018"
 description = "Session types for asynchronous communication between multiple parties."
+readme = "../README.md"
 repository = "https://github.com/zakcutner/rumpsteak"
 license = "MIT"
 keywords = ["async", "deadlock", "safety", "session", "types"]
