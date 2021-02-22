@@ -53,9 +53,9 @@ async fn sleep() {
 async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
     let x = input;
     try_session(role, |s: RingA<'_>| async {
-        sleep().await;
         let s = s.send(Value(x))?;
         let (Value(y), s) = s.receive().await?;
+        sleep().await;
         Ok((x + y, s))
     })
     .await
@@ -75,9 +75,9 @@ async fn ring_b(role: &mut B, input: i32) -> Result<i32> {
 async fn ring_b_optimized(role: &mut B, input: i32) -> Result<i32> {
     let x = input;
     try_session(role, |s: RingBOptimized<'_>| async {
-        sleep().await;
         let s = s.send(Value(x))?;
         let (Value(y), s) = s.receive().await?;
+        sleep().await;
         Ok((x + y, s))
     })
     .await
@@ -97,9 +97,9 @@ async fn ring_c(role: &mut C, input: i32) -> Result<i32> {
 async fn ring_c_optimized(role: &mut C, input: i32) -> Result<i32> {
     let x = input;
     try_session(role, |s: RingCOptimized<'_>| async {
-        sleep().await;
         let s = s.send(Value(x))?;
         let (Value(y), s) = s.receive().await?;
+        sleep().await;
         Ok((x + y, s))
     })
     .await
