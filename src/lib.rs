@@ -3,7 +3,7 @@ pub mod channel;
 pub use rumpsteak_macros::{Choice, IntoSession, Message, Role, Roles};
 
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
-use std::{convert::Infallible, future::Future, marker::PhantomData};
+use std::{any::Any, convert::Infallible, future::Future, marker::PhantomData};
 use thiserror::Error;
 
 pub type SendError<Q, R> = <<Q as Route<R>>::Route as Sink<<Q as Role>::Message>>::Error;
@@ -17,9 +17,19 @@ pub enum ReceiveError {
 }
 
 pub trait Message<L>: Sized {
-    fn wrap(label: L) -> Self;
+    fn upcast(label: L) -> Self;
 
-    fn try_unwrap(self) -> Result<L, Self>;
+    fn downcast(self) -> Result<L, Self>;
+}
+
+impl<L: 'static> Message<L> for Box<dyn Any> {
+    fn upcast(label: L) -> Self {
+        Box::new(label)
+    }
+
+    fn downcast(self) -> Result<L, Self> {
+        self.downcast().map(|label| *label)
+    }
 }
 
 pub trait Role {
@@ -84,7 +94,7 @@ impl<R, L, S: Session> Send<R, L, S> {
         Q::Message: Message<L>,
         Q::Route: Sink<Q::Message> + Unpin,
     {
-        role.route().send(Message::wrap(label)).await?;
+        role.route().send(Message::upcast(label)).await?;
         Ok(Session::from_state(self.state))
     }
 }
@@ -111,7 +121,7 @@ impl<R, L, S: Session> Receive<R, L, S> {
     {
         let message = role.route().next().await;
         let message = message.ok_or(ReceiveError::EmptyStream)?;
-        let label = Message::try_unwrap(message).or(Err(ReceiveError::UnexpectedType))?;
+        let label = message.downcast().or(Err(ReceiveError::UnexpectedType))?;
         Ok((label, Session::from_state(self.state)))
     }
 }
@@ -145,13 +155,13 @@ impl<R, C> Select<R, C> {
         Q::Route: Sink<Q::Message> + Unpin,
         C: Choice<L>,
     {
-        role.route().send(Message::wrap(label)).await?;
+        role.route().send(Message::upcast(label)).await?;
         Ok(Session::from_state(self.state))
     }
 }
 
 pub trait Choices<M>: Sized {
-    fn unwrap(state: State, message: M) -> Option<Self>;
+    fn downcast(state: State, message: M) -> Result<Self, M>;
 }
 
 pub struct Branch<R, C> {
@@ -176,7 +186,7 @@ impl<R, C> Branch<R, C> {
     {
         let message = role.route().next().await;
         let message = message.ok_or(ReceiveError::EmptyStream)?;
-        C::unwrap(self.state, message).ok_or(ReceiveError::UnexpectedType)
+        C::downcast(self.state, message).or(Err(ReceiveError::UnexpectedType))
     }
 }
 

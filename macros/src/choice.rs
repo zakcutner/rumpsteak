@@ -45,14 +45,16 @@ pub fn choice(input: TokenStream) -> Result<TokenStream> {
     let idents = variants.iter().map(|variant| &variant.ident);
     output.extend(quote! {
         impl #impl_generics ::rumpsteak::Choices<#message> for #ident #ty_generics #where_clause {
-            fn unwrap(state: ::rumpsteak::State, message: #message) -> Option<Self> {
-                match message {
-                    #(#message::#idents(label) => Some(Self::#idents(
-                        label,
-                        ::rumpsteak::Session::from_state(state)
-                    )),)*
-                    _ => None,
-                }
+            fn downcast(
+                state: ::rumpsteak::State,
+                message: #message,
+            ) -> ::core::result::Result<Self, #message> {
+                #(let message = match ::rumpsteak::Message::downcast(message) {
+                    Ok(label) => return Ok(Self::#idents(label, ::rumpsteak::Session::from_state(state))),
+                    Err(message) => message
+                };)*
+
+                Err(message)
             }
         }
     });

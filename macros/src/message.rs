@@ -33,11 +33,11 @@ pub fn message(input: TokenStream) -> Result<TokenStream> {
         let ty = &field.ty;
         output.extend(quote! {
             impl #impl_generics ::rumpsteak::Message<#ty> for #ident #ty_generics #where_clause {
-                fn wrap(label: #ty) -> Self {
+                fn upcast(label: #ty) -> Self {
                     Self::#variant_ident(label)
                 }
 
-                fn try_unwrap(self) -> ::core::result::Result<#ty, Self> {
+                fn downcast(self) -> ::core::result::Result<#ty, Self> {
                     match self {
                         Self::#variant_ident(label) => Ok(label),
                         _ => Err(self),
