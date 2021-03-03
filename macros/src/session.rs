@@ -1,12 +1,9 @@
-use crate::parse::{self, Role};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{parse2, spanned::Spanned, Data, DeriveInput, Error, Index, Result};
+use syn::{parse2, Data, DeriveInput, Error, Index, Result};
 
 pub fn into_session(input: TokenStream) -> Result<TokenStream> {
     let input = parse2::<DeriveInput>(input)?;
-
-    let role = parse::attribute::<Role>(&input.attrs, "role", input.span())?;
 
     let ident = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -29,13 +26,13 @@ pub fn into_session(input: TokenStream) -> Result<TokenStream> {
     };
 
     Ok(quote! {
-        impl #impl_generics ::rumpsteak::Session<#role> for #ident #ty_generics #where_clause {
-            fn from_state(state: ::rumpsteak::State<#role>) -> Self {
+        impl #impl_generics ::rumpsteak::Session for #ident #ty_generics #where_clause {
+            fn from_state(state: ::rumpsteak::State) -> Self {
                 Self { #field_ident: ::rumpsteak::Session::from_state(state) }
             }
         }
 
-        impl #impl_generics ::rumpsteak::IntoSession<#role> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::rumpsteak::IntoSession for #ident #ty_generics #where_clause {
             type Session = #field_ty;
 
             fn into_session(self) -> Self::Session {

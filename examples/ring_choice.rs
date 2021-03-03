@@ -1,47 +1,29 @@
-use futures::{executor, try_join};
-use rumpsteak::{
-    choice::Choice,
-    role::{From, Role, Roles, To},
-    try_session, Branch, Label, Receive, Result, Select, Send,
-};
-use std::convert::Infallible;
+use futures::{channel::mpsc, executor, try_join};
+use rumpsteak::{try_session, Branch, Choice, Message, Receive, Role, Roles, Select, Send};
+use std::{convert::Infallible, error::Error, result};
+
+type Result<T> = result::Result<T, Box<dyn Error>>;
+
+type Sender = mpsc::UnboundedSender<Label>;
+type Receiver = mpsc::UnboundedReceiver<Label>;
 
 #[derive(Roles)]
-struct Roles {
-    a: A,
-    b: B,
-    c: C,
-}
+struct Roles(A, B, C);
 
 #[derive(Role)]
-#[message(Message)]
-struct A {
-    #[route(B)]
-    b: To<B>,
-    #[route(C)]
-    c: From<C>,
-}
+#[message(Label)]
+struct A(#[route(B)] Sender, #[route(C)] Receiver);
 
 #[derive(Role)]
-#[message(Message)]
-struct B {
-    #[route(A)]
-    a: From<A>,
-    #[route(C)]
-    c: To<C>,
-}
+#[message(Label)]
+struct B(#[route(A)] Receiver, #[route(C)] Sender);
 
 #[derive(Role)]
-#[message(Message)]
-struct C {
-    #[route(A)]
-    a: To<A>,
-    #[route(B)]
-    b: From<B>,
-}
+#[message(Label)]
+struct C(#[route(A)] Sender, #[route(B)] Receiver);
 
-#[derive(Label)]
-enum Message {
+#[derive(Message)]
+enum Label {
     Add(Add),
     Sub(Sub),
 }
@@ -49,39 +31,39 @@ enum Message {
 struct Add(i32);
 struct Sub(i32);
 
-type RingA<'r> = Send<'r, A, B, Add, Branch<'r, A, C, RingAChoice<'r>>>;
+type RingA = Send<B, Add, Branch<C, RingAChoice>>;
 
 #[derive(Choice)]
-#[role('r, A)]
-enum RingAChoice<'r> {
-    Add(Add, RingA<'r>),
-    Sub(Sub, RingA<'r>),
+#[message(Label)]
+enum RingAChoice {
+    Add(Add, RingA),
+    Sub(Sub, RingA),
 }
 
-type RingB<'r> = Select<'r, B, C, RingBChoice<'r>>;
+type RingB = Select<C, RingBChoice>;
 
 #[derive(Choice)]
-#[role('r, B)]
-enum RingBChoice<'r> {
-    Add(Add, Receive<'r, B, A, Add, RingB<'r>>),
-    Sub(Sub, Receive<'r, B, A, Add, RingB<'r>>),
+#[message(Label)]
+enum RingBChoice {
+    Add(Add, Receive<A, Add, RingB>),
+    Sub(Sub, Receive<A, Add, RingB>),
 }
 
-type RingC<'r> = Branch<'r, C, B, RingCChoice<'r>>;
+type RingC = Branch<B, RingCChoice>;
 
 #[derive(Choice)]
-#[role('r, C)]
-enum RingCChoice<'r> {
-    Add(Add, Send<'r, C, A, Add, RingC<'r>>),
-    Sub(Sub, Send<'r, C, A, Sub, RingC<'r>>),
+#[message(Label)]
+enum RingCChoice {
+    Add(Add, Send<A, Add, RingC>),
+    Sub(Sub, Send<A, Sub, RingC>),
 }
 
 async fn ring_a(role: &mut A, mut input: i32) -> Result<Infallible> {
-    try_session(role, |mut s: RingA<'_>| async {
+    try_session(|mut s: RingA| async {
         loop {
             println!("A: {}", input);
             let x = input * 2;
-            s = match s.send(Add(x))?.branch().await? {
+            s = match s.send(role, Add(x)).await?.branch(role).await? {
                 RingAChoice::Add(Add(y), s) => {
                     input = x + y;
                     s
@@ -97,18 +79,18 @@ async fn ring_a(role: &mut A, mut input: i32) -> Result<Infallible> {
 }
 
 async fn ring_b(role: &mut B, mut input: i32) -> Result<Infallible> {
-    try_session(role, |mut s: RingB<'_>| async {
+    try_session(|mut s: RingB| async {
         loop {
             println!("B: {}", input);
             let x = input * 2;
             s = if x > 0 {
-                let s = s.select(Add(x))?;
-                let (Add(y), s) = s.receive().await?;
+                let s = s.select(role, Add(x)).await?;
+                let (Add(y), s) = s.receive(role).await?;
                 input = y + x;
                 s
             } else {
-                let s = s.select(Sub(x))?;
-                let (Add(y), s) = s.receive().await?;
+                let s = s.select(role, Sub(x)).await?;
+                let (Add(y), s) = s.receive(role).await?;
                 input = y - x;
                 s
             };
@@ -118,18 +100,18 @@ async fn ring_b(role: &mut B, mut input: i32) -> Result<Infallible> {
 }
 
 async fn ring_c(role: &mut C, mut input: i32) -> Result<Infallible> {
-    try_session(role, |mut s: RingC<'_>| async {
+    try_session(|mut s: RingC| async {
         loop {
             println!("C: {}", input);
             let x = input * 2;
-            s = match s.branch().await? {
+            s = match s.branch(role).await? {
                 RingCChoice::Add(Add(y), s) => {
-                    let s = s.send(Add(x))?;
+                    let s = s.send(role, Add(x)).await?;
                     input = x + y;
                     s
                 }
                 RingCChoice::Sub(Sub(y), s) => {
-                    let s = s.send(Sub(x))?;
+                    let s = s.send(role, Sub(x)).await?;
                     input = x - y;
                     s
                 }
@@ -140,13 +122,8 @@ async fn ring_c(role: &mut C, mut input: i32) -> Result<Infallible> {
 }
 
 fn main() {
-    let mut roles = Roles::default();
+    let Roles(mut a, mut b, mut c) = Roles::default();
     executor::block_on(async {
-        try_join!(
-            ring_a(&mut roles.a, -1),
-            ring_b(&mut roles.b, 0),
-            ring_c(&mut roles.c, 1),
-        )
-        .unwrap();
+        try_join!(ring_a(&mut a, -1), ring_b(&mut b, 0), ring_c(&mut c, 1)).unwrap();
     });
 }

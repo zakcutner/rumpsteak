@@ -1,32 +1,35 @@
-#![allow(clippy::type_complexity)]
-
 use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
     executor::{self, ThreadPool},
     try_join, FutureExt,
 };
 use rumpsteak::{
-    role::{Nil, Role, Roles, ToFrom},
-    try_session, End, Label, Receive, Result, Send,
+    channel::{Bidirectional, Nil},
+    try_session, End, Message, Receive, Role, Roles, Send,
 };
-use std::{future::Future, marker};
+use std::{error::Error, future::Future, marker, result};
+
+type Result<T> = result::Result<T, Box<dyn Error + marker::Send + Sync>>;
+
+type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
 #[derive(Roles)]
 struct Roles(S, K, T);
 
 #[derive(Role)]
-#[message(Message)]
-struct S(#[route(K)] ToFrom<K>, #[route(T)] Nil<T>);
+#[message(Label)]
+struct S(#[route(K)] Channel, #[route(T)] Nil);
 
 #[derive(Role)]
-#[message(Message)]
-struct K(#[route(S)] ToFrom<S>, #[route(T)] ToFrom<T>);
+#[message(Label)]
+struct K(#[route(S)] Channel, #[route(T)] Channel);
 
 #[derive(Role)]
-#[message(Message)]
-struct T(#[route(S)] Nil<S>, #[route(K)] ToFrom<K>);
+#[message(Label)]
+struct T(#[route(S)] Nil, #[route(K)] Channel);
 
-#[derive(Label)]
-enum Message {
+#[derive(Message)]
+enum Label {
     Ready(Ready),
     Copy(Copy),
 }
@@ -34,22 +37,20 @@ enum Message {
 struct Ready;
 struct Copy(i32);
 
-#[rustfmt::skip]
-type Source<'s> = Receive<'s, S, K, Ready, Send<'s, S, K, Copy, Receive<'s, S, K, Ready, Send<'s, S, K, Copy, End<'s>>>>>;
+type Source = Receive<K, Ready, Send<K, Copy, Receive<K, Ready, Send<K, Copy, End>>>>;
 
 #[rustfmt::skip]
-type Kernel<'k> = Send<'k, K, S, Ready, Receive<'k, K, S, Copy, Receive<'k, K, T, Ready, Send<'k, K, T, Copy, Send<'k, K, S, Ready, Receive<'k, K, S, Copy, Receive<'k, K, T, Ready, Send<'k, K, T, Copy, End<'k>>>>>>>>>;
+type Kernel = Send<S, Ready, Receive<S, Copy, Receive<T, Ready, Send<T, Copy, Send<S, Ready, Receive<S, Copy, Receive<T, Ready, Send<T, Copy, End>>>>>>>>;
 
-#[rustfmt::skip]
-type Sink<'t> = Send<'t, T, K, Ready, Receive<'t, T, K, Copy, Send<'t, T, K, Ready, Receive<'t, T, K, Copy, End<'t>>>>>;
+type Sink = Send<K, Ready, Receive<K, Copy, Send<K, Ready, Receive<K, Copy, End>>>>;
 
 async fn source(role: &mut S, input: (i32, i32)) -> Result<()> {
-    try_session(role, |s: Source<'_>| async {
-        let (Ready, s) = s.receive().await?;
-        let s = s.send(Copy(input.0))?;
+    try_session(|s: Source| async {
+        let (Ready, s) = s.receive(role).await?;
+        let s = s.send(role, Copy(input.0)).await?;
 
-        let (Ready, s) = s.receive().await?;
-        let s = s.send(Copy(input.1))?;
+        let (Ready, s) = s.receive(role).await?;
+        let s = s.send(role, Copy(input.1)).await?;
 
         Ok(((), s))
     })
@@ -57,16 +58,16 @@ async fn source(role: &mut S, input: (i32, i32)) -> Result<()> {
 }
 
 async fn kernel(role: &mut K) -> Result<()> {
-    try_session(role, |s: Kernel<'_>| async {
-        let s = s.send(Ready)?;
-        let (Copy(x), s) = s.receive().await?;
-        let (Ready, s) = s.receive().await?;
-        let s = s.send(Copy(x))?;
+    try_session(|s: Kernel| async {
+        let s = s.send(role, Ready).await?;
+        let (Copy(x), s) = s.receive(role).await?;
+        let (Ready, s) = s.receive(role).await?;
+        let s = s.send(role, Copy(x)).await?;
 
-        let s = s.send(Ready)?;
-        let (Copy(y), s) = s.receive().await?;
-        let (Ready, s) = s.receive().await?;
-        let s = s.send(Copy(y))?;
+        let s = s.send(role, Ready).await?;
+        let (Copy(y), s) = s.receive(role).await?;
+        let (Ready, s) = s.receive(role).await?;
+        let s = s.send(role, Copy(y)).await?;
 
         Ok(((), s))
     })
@@ -74,12 +75,12 @@ async fn kernel(role: &mut K) -> Result<()> {
 }
 
 async fn sink(role: &mut T) -> Result<(i32, i32)> {
-    try_session(role, |s: Sink<'_>| async {
-        let s = s.send(Ready)?;
-        let (Copy(x), s) = s.receive().await?;
+    try_session(|s: Sink| async {
+        let s = s.send(role, Ready).await?;
+        let (Copy(x), s) = s.receive(role).await?;
 
-        let s = s.send(Ready)?;
-        let (Copy(y), s) = s.receive().await?;
+        let s = s.send(role, Ready).await?;
+        let (Copy(y), s) = s.receive(role).await?;
 
         Ok(((x, y), s))
     })

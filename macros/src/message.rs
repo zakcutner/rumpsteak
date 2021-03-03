@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse2, Data, DeriveInput, Error, Fields, Result};
 
-pub fn label(input: TokenStream) -> Result<TokenStream> {
+pub fn message(input: TokenStream) -> Result<TokenStream> {
     let input = parse2::<DeriveInput>(input)?;
 
     let ident = &input.ident;
@@ -32,15 +32,15 @@ pub fn label(input: TokenStream) -> Result<TokenStream> {
 
         let ty = &field.ty;
         output.extend(quote! {
-            impl #impl_generics ::rumpsteak::Label<#ty> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::rumpsteak::Message<#ty> for #ident #ty_generics #where_clause {
                 fn wrap(label: #ty) -> Self {
                     Self::#variant_ident(label)
                 }
 
-                fn unwrap(self) -> Option<#ty> {
+                fn try_unwrap(self) -> ::core::result::Result<#ty, Self> {
                     match self {
-                        Self::#variant_ident(label) => Some(label),
-                        _ => None,
+                        Self::#variant_ident(label) => Ok(label),
+                        _ => Err(self),
                     }
                 }
             }

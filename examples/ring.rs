@@ -1,45 +1,45 @@
-use futures::{executor, try_join};
-use rumpsteak::{
-    role::{From, Role, Roles, To},
-    try_session, End, Label, Receive, Result, Send,
-};
+use futures::{channel::mpsc, executor, try_join};
+use rumpsteak::{try_session, End, Message, Receive, Role, Roles, Send};
+use std::{error::Error, result};
+
+type Result<T> = result::Result<T, Box<dyn Error>>;
+
+type Sender = mpsc::UnboundedSender<Label>;
+type Receiver = mpsc::UnboundedReceiver<Label>;
 
 #[derive(Roles)]
 struct Roles(A, B, C);
 
 #[derive(Role)]
-#[message(Message)]
-struct A(#[route(B)] To<B>, #[route(C)] From<C>);
+#[message(Label)]
+struct A(#[route(B)] Sender, #[route(C)] Receiver);
 
 #[derive(Role)]
-#[message(Message)]
-struct B(#[route(A)] From<A>, #[route(C)] To<C>);
+#[message(Label)]
+struct B(#[route(A)] Receiver, #[route(C)] Sender);
 
 #[derive(Role)]
-#[message(Message)]
-struct C(#[route(A)] To<A>, #[route(B)] From<B>);
+#[message(Label)]
+struct C(#[route(A)] Sender, #[route(B)] Receiver);
 
-#[derive(Label)]
-enum Message {
+#[derive(Message)]
+enum Label {
     Value(Value),
 }
 
 struct Value(i32);
 
-#[rustfmt::skip]
-type RingA<'a> = Send<'a, A, B, Value, Receive<'a, A, C, Value, End<'a>>>;
+type RingA = Send<B, Value, Receive<C, Value, End>>;
 
-#[rustfmt::skip]
-type RingB<'b> = Receive<'b, B, A, Value, Send<'b, B, C, Value, End<'b>>>;
+type RingB = Receive<A, Value, Send<C, Value, End>>;
 
-#[rustfmt::skip]
-type RingC<'c> = Receive<'c, C, B, Value, Send<'c, C, A, Value, End<'c>>>;
+type RingC = Receive<B, Value, Send<A, Value, End>>;
 
 async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
     let x = input;
-    try_session(role, |s: RingA<'_>| async {
-        let s = s.send(Value(x))?;
-        let (Value(y), s) = s.receive().await?;
+    try_session(|s: RingA| async {
+        let s = s.send(role, Value(x)).await?;
+        let (Value(y), s) = s.receive(role).await?;
         Ok((x + y, s))
     })
     .await
@@ -47,9 +47,9 @@ async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
 
 async fn ring_b(role: &mut B, input: i32) -> Result<i32> {
     let x = input;
-    try_session(role, |s: RingB<'_>| async {
-        let (Value(y), s) = s.receive().await?;
-        let s = s.send(Value(x))?;
+    try_session(|s: RingB| async {
+        let (Value(y), s) = s.receive(role).await?;
+        let s = s.send(role, Value(x)).await?;
         Ok((x + y, s))
     })
     .await
@@ -57,9 +57,9 @@ async fn ring_b(role: &mut B, input: i32) -> Result<i32> {
 
 async fn ring_c(role: &mut C, input: i32) -> Result<i32> {
     let x = input;
-    try_session(role, |s: RingC<'_>| async {
-        let (Value(y), s) = s.receive().await?;
-        let s = s.send(Value(x))?;
+    try_session(|s: RingC| async {
+        let (Value(y), s) = s.receive(role).await?;
+        let s = s.send(role, Value(x)).await?;
         Ok((x + y, s))
     })
     .await

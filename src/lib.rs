@@ -1,256 +1,199 @@
 pub mod channel;
-pub mod choice;
-pub mod role;
 
-pub use self::channel::SendError;
-pub use rumpsteak_macros::{IntoSession, Label};
+pub use rumpsteak_macros::{Choice, IntoSession, Message, Role, Roles};
 
-use self::{
-    choice::{External, Internal},
-    role::{Receiver, Role, Route, Sender},
-};
-use futures::FutureExt;
-use std::{convert::Infallible, future::Future, marker::PhantomData, result};
+use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
+use std::{convert::Infallible, future::Future, marker::PhantomData};
 use thiserror::Error;
 
-pub type Result<T, E = Error> = result::Result<T, E>;
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error(transparent)]
-    Send(#[from] SendError),
-    #[error(transparent)]
-    Receive(#[from] ReceiveError),
-}
+pub type SendError<Q, R> = <<Q as Route<R>>::Route as Sink<<Q as Role>::Message>>::Error;
 
 #[derive(Debug, Error)]
 pub enum ReceiveError {
-    #[error(transparent)]
-    Channel(#[from] channel::ReceiveError),
+    #[error("receiver stream is empty")]
+    EmptyStream,
     #[error("received message with an unexpected type")]
     UnexpectedType,
 }
 
-pub trait Label<L> {
+pub trait Message<L>: Sized {
     fn wrap(label: L) -> Self;
 
-    fn unwrap(self) -> Option<L>;
+    fn try_unwrap(self) -> Result<L, Self>;
 }
 
-pub struct State<'r, R: Role>(&'r mut R);
+pub trait Role {
+    type Message;
+}
 
-impl<'r, R: Role> State<'r, R> {
-    pub fn into_session<S: Session<'r, R>>(self) -> S {
-        S::from_state(self)
+pub trait Route<R>: Role + Sized {
+    type Route;
+
+    fn route(&mut self) -> &mut Self::Route;
+}
+
+pub struct State {
+    _private: (),
+}
+
+impl State {
+    #[inline]
+    fn new() -> Self {
+        Self { _private: () }
     }
 }
 
-pub trait Session<'r, R: Role> {
-    fn from_state(state: State<'r, R>) -> Self;
+pub trait Session {
+    fn from_state(state: State) -> Self;
 }
 
-pub trait IntoSession<'r, R: Role>: Session<'r, R> {
-    type Session: Session<'r, R>;
+pub trait IntoSession: Session {
+    type Session: Session;
 
     fn into_session(self) -> Self::Session;
 }
 
-pub struct End<'r> {
-    phantom: PhantomData<&'r ()>,
+pub struct End {
+    _state: State,
 }
 
-impl<'r, R: Role> Session<'r, R> for End<'r> {
+impl Session for End {
     #[inline]
-    fn from_state(_: State<'r, R>) -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+    fn from_state(state: State) -> Self {
+        Self { _state: state }
     }
 }
 
-pub struct Send<'q, Q: Route<R>, R: Route<Q>, L, S: Session<'q, Q>>
-where
-    Q::Message: Label<L>,
-    Q::Route: Sender<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Receiver<Q>,
-{
-    state: State<'q, Q>,
+pub struct Send<R, L, S: Session> {
+    state: State,
     phantom: PhantomData<(R, L, S)>,
 }
 
-impl<'q, Q: Route<R>, R: Route<Q>, L, S: Session<'q, Q>> Session<'q, Q> for Send<'q, Q, R, L, S>
-where
-    Q::Message: Label<L>,
-    Q::Route: Sender<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Receiver<Q>,
-{
+impl<R, L, S: Session> Session for Send<R, L, S> {
     #[inline]
-    fn from_state(state: State<'q, Q>) -> Self {
-        Self {
-            state,
-            phantom: PhantomData,
-        }
+    fn from_state(state: State) -> Self {
+        let phantom = PhantomData;
+        Self { state, phantom }
     }
 }
 
-impl<'q, Q: Route<R>, R: Route<Q>, L, S: Session<'q, Q>> Send<'q, Q, R, L, S>
-where
-    Q::Message: Label<L>,
-    Q::Route: Sender<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Receiver<Q>,
-{
+impl<R, L, S: Session> Send<R, L, S> {
     #[inline]
-    pub fn send(self, label: L) -> Result<S, SendError> {
-        self.state.0.route().sender().send(Label::wrap(label))?;
-        Ok(self.state.into_session())
-    }
-}
-
-pub struct Receive<'q, Q: Route<R>, R: Route<Q>, L, S: Session<'q, Q>>
-where
-    Q::Message: Label<L>,
-    Q::Route: Receiver<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Sender<Q>,
-{
-    state: State<'q, Q>,
-    phantom: PhantomData<(R, L, S)>,
-}
-
-impl<'q, Q: Route<R>, R: Route<Q>, L, S: Session<'q, Q>> Session<'q, Q> for Receive<'q, Q, R, L, S>
-where
-    Q::Message: Label<L>,
-    Q::Route: Receiver<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Sender<Q>,
-{
-    #[inline]
-    fn from_state(state: State<'q, Q>) -> Self {
-        Self {
-            state,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<'q, Q: Route<R>, R: Route<Q>, L, S: Session<'q, Q>> Receive<'q, Q, R, L, S>
-where
-    Q::Message: Label<L>,
-    Q::Route: Receiver<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Sender<Q>,
-{
-    #[inline]
-    pub async fn receive(self) -> Result<(L, S), ReceiveError> {
-        let label = Label::unwrap(self.state.0.route().receiver().receive().await?);
-        let label = label.ok_or(ReceiveError::UnexpectedType)?;
-        Ok((label, self.state.into_session()))
-    }
-}
-
-pub struct Select<'q, Q: Route<R>, R: Route<Q>, C>
-where
-    Q::Route: Sender<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Receiver<Q>,
-{
-    state: State<'q, Q>,
-    phantom: PhantomData<(R, C)>,
-}
-
-impl<'q, Q: Route<R>, R: Route<Q>, C> Session<'q, Q> for Select<'q, Q, R, C>
-where
-    Q::Route: Sender<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Receiver<Q>,
-{
-    #[inline]
-    fn from_state(state: State<'q, Q>) -> Self {
-        Self {
-            state,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<'q, Q: Route<R>, R: Route<Q>, C> Select<'q, Q, R, C>
-where
-    Q::Route: Sender<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Receiver<Q>,
-{
-    #[inline]
-    pub fn select<L>(self, label: L) -> Result<C::Session, SendError>
+    pub async fn send<Q: Route<R>>(self, role: &mut Q, label: L) -> Result<S, SendError<Q, R>>
     where
-        Q::Message: Label<L>,
-        C: Internal<'q, Q, L>,
+        Q::Message: Message<L>,
+        Q::Route: Sink<Q::Message> + Unpin,
     {
-        self.state.0.route().sender().send(Label::wrap(label))?;
-        Ok(self.state.into_session())
+        role.route().send(Message::wrap(label)).await?;
+        Ok(Session::from_state(self.state))
     }
 }
 
-pub struct Branch<'q, Q: Route<R>, R: Route<Q>, C: External<'q, Q>>
-where
-    Q::Route: Receiver<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Sender<Q>,
-{
-    state: State<'q, Q>,
+pub struct Receive<R, L, S: Session> {
+    state: State,
+    phantom: PhantomData<(R, L, S)>,
+}
+
+impl<R, L, S: Session> Session for Receive<R, L, S> {
+    #[inline]
+    fn from_state(state: State) -> Self {
+        let phantom = PhantomData;
+        Self { state, phantom }
+    }
+}
+
+impl<R, L, S: Session> Receive<R, L, S> {
+    #[inline]
+    pub async fn receive<Q: Route<R>>(self, role: &mut Q) -> Result<(L, S), ReceiveError>
+    where
+        Q::Message: Message<L>,
+        Q::Route: Stream<Item = Q::Message> + Unpin,
+    {
+        let message = role.route().next().await;
+        let message = message.ok_or(ReceiveError::EmptyStream)?;
+        let label = Message::try_unwrap(message).or(Err(ReceiveError::UnexpectedType))?;
+        Ok((label, Session::from_state(self.state)))
+    }
+}
+
+pub trait Choice<L> {
+    type Session: Session;
+}
+
+pub struct Select<R, C> {
+    state: State,
     phantom: PhantomData<(R, C)>,
 }
 
-impl<'q, Q: Route<R>, R: Route<Q>, C: External<'q, Q>> Session<'q, Q> for Branch<'q, Q, R, C>
-where
-    Q::Route: Receiver<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Sender<Q>,
-{
+impl<R, C> Session for Select<R, C> {
     #[inline]
-    fn from_state(state: State<'q, Q>) -> Self {
-        Self {
-            state,
-            phantom: PhantomData,
-        }
+    fn from_state(state: State) -> Self {
+        let phantom = PhantomData;
+        Self { state, phantom }
     }
 }
 
-impl<'q, Q: Route<R>, R: Route<Q>, C: External<'q, Q>> Branch<'q, Q, R, C>
-where
-    Q::Route: Receiver<R>,
-    R: Role<Message = Q::Message>,
-    R::Route: Sender<Q>,
-{
+impl<R, C> Select<R, C> {
     #[inline]
-    pub async fn branch(self) -> Result<C, ReceiveError> {
-        let message = self.state.0.route().receiver().receive().await?;
-        C::choice(self.state, message).ok_or(ReceiveError::UnexpectedType)
+    pub async fn select<Q: Route<R>, L>(
+        self,
+        role: &mut Q,
+        label: L,
+    ) -> Result<C::Session, SendError<Q, R>>
+    where
+        Q::Message: Message<L>,
+        Q::Route: Sink<Q::Message> + Unpin,
+        C: Choice<L>,
+    {
+        role.route().send(Message::wrap(label)).await?;
+        Ok(Session::from_state(self.state))
+    }
+}
+
+pub trait Choices<M>: Sized {
+    fn unwrap(state: State, message: M) -> Option<Self>;
+}
+
+pub struct Branch<R, C> {
+    state: State,
+    phantom: PhantomData<(R, C)>,
+}
+
+impl<R, C> Session for Branch<R, C> {
+    #[inline]
+    fn from_state(state: State) -> Self {
+        let phantom = PhantomData;
+        Self { state, phantom }
+    }
+}
+
+impl<R, C> Branch<R, C> {
+    #[inline]
+    pub async fn branch<Q: Route<R>>(self, role: &mut Q) -> Result<C, ReceiveError>
+    where
+        Q::Route: Stream<Item = Q::Message> + Unpin,
+        C: Choices<Q::Message>,
+    {
+        let message = role.route().next().await;
+        let message = message.ok_or(ReceiveError::EmptyStream)?;
+        C::unwrap(self.state, message).ok_or(ReceiveError::UnexpectedType)
     }
 }
 
 #[inline]
-pub async fn session<'r, R: Role, S: Session<'r, R>, T, F>(
-    role: &'r mut R,
-    f: impl FnOnce(S) -> F,
-) -> T
+pub async fn session<'r, S: Session, T, F>(f: impl FnOnce(S) -> F) -> T
 where
-    F: Future<Output = (T, End<'r>)>,
+    F: Future<Output = (T, End)>,
 {
-    let output = try_session(role, |s| f(s).map(Ok)).await;
+    let output = try_session(|s| f(s).map(Ok)).await;
     output.unwrap_or_else(|infallible: Infallible| match infallible {})
 }
 
 #[inline]
-pub async fn try_session<'r, R: Role, S: Session<'r, R>, T, E, F>(
-    role: &'r mut R,
-    f: impl FnOnce(S) -> F,
-) -> Result<T, E>
+pub async fn try_session<'r, S: Session, T, E, F>(f: impl FnOnce(S) -> F) -> Result<T, E>
 where
-    F: Future<Output = Result<(T, End<'r>), E>>,
+    F: Future<Output = Result<(T, End), E>>,
 {
-    let state = State(role);
-    f(state.into_session()).await.map(|(output, _)| output)
+    let session = Session::from_state(State::new());
+    f(session).await.map(|(output, _)| output)
 }

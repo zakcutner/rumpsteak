@@ -3,13 +3,13 @@ mod template;
 
 use self::{
     parser::Tree,
-    template::{Choice, Definition, Label, Protocol, Role, Route, Type},
+    template::{Choice, Definition, DefinitionBody, Label, Protocol, Role, Route, Type},
 };
 use heck::{CamelCase, SnakeCase};
 use indexmap::IndexMap;
 use petgraph::{
-    graph::{node_index, DefaultIx, NodeIndex},
-    visit::{EdgeRef, VisitMap, Visitable},
+    graph::{node_index, NodeIndex},
+    visit::{EdgeRef, IntoNodeReferences, VisitMap, Visitable},
 };
 use std::{error::Error, fs, io, path::Path, result};
 
@@ -86,6 +86,13 @@ impl<'a, P: AsRef<Path>> Builder<'a, P> {
     }
 }
 
+fn generate_nodes(graph: &Graph<'_>) -> Vec<String> {
+    graph
+        .node_references()
+        .map(|(_, node)| node.name.to_camel_case())
+        .collect()
+}
+
 struct DoublePeekable<I: Iterator> {
     first: Option<I::Item>,
     second: Option<I::Item>,
@@ -149,12 +156,6 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
         }
 
         fn visit(&mut self, node: NodeIndex) -> (Type, bool) {
-            if self.visited.is_visited(&node) {
-                self.looped.visit(node);
-                return (Type::Definition(node.index()), false);
-            }
-            self.visited.visit(node);
-
             let weight = &self.graph[node];
             let mut edges = DoublePeekable::new(self.graph.edges(node));
 
@@ -163,8 +164,13 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
                 return (Type::End, true);
             }
 
-            let index = node.index();
             if let Some(edge) = edges.singleton() {
+                if self.visited.is_visited(&node) {
+                    self.looped.visit(node);
+                    return (Type::Node(node.index()), false);
+                }
+                self.visited.visit(node);
+
                 let (next, safe) = self.visit(edge.target());
                 let ty = Type::Message {
                     direction: weight.direction.unwrap(),
@@ -174,12 +180,27 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
                 };
 
                 if self.looped.is_visited(&node) {
-                    self.definitions.push(Definition::Type { safe, index, ty });
-                    return (Type::Definition(index), true);
+                    self.definitions.push(Definition {
+                        node: node.index(),
+                        body: DefinitionBody::Type { safe, ty },
+                    });
+                    return (Type::Node(node.index()), true);
                 }
 
                 return (ty, safe);
             }
+
+            let ty = Type::Choice {
+                direction: weight.direction.unwrap(),
+                role: weight.role.unwrap(),
+                node: node.index(),
+            };
+
+            if self.visited.is_visited(&node) {
+                self.looped.visit(node);
+                return (ty, true);
+            }
+            self.visited.visit(node);
 
             let choices = edges
                 .map(|edge| Choice {
@@ -187,21 +208,27 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
                     ty: self.visit(edge.target()).0,
                 })
                 .collect::<Vec<_>>();
-            self.definitions.push(Definition::Choice { index, choices });
-
-            let ty = Type::Choice {
-                direction: weight.direction.unwrap(),
-                role: weight.role.unwrap(),
-                index,
-            };
+            self.definitions.push(Definition {
+                node: node.index(),
+                body: DefinitionBody::Choice(choices),
+            });
 
             (ty, true)
         }
     }
 
+    let root = node_index(0);
     let mut visitor = Visitor::new(graph);
-    visitor.looped.visit(node_index::<DefaultIx>(0));
-    visitor.visit(node_index(0));
+    visitor.looped.visit(root);
+
+    let ty = visitor.visit(root).0;
+    if ty.is_choice() {
+        visitor.definitions.push(Definition {
+            node: root.index(),
+            body: DefinitionBody::Type { safe: true, ty },
+        });
+    }
+
     visitor.definitions
 }
 
@@ -212,6 +239,7 @@ fn generate_roles(roles: &[(&str, Graph<'_>)]) -> Vec<Role> {
         .map(|(i, (name, graph))| Role {
             camel: name.to_camel_case(),
             snake: name.to_snake_case(),
+            nodes: generate_nodes(graph),
             routes: (0..roles.len()).filter(|&j| j != i).map(Route).collect(),
             definitions: generate_definitions(graph),
         })

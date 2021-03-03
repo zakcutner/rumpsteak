@@ -1,132 +1,138 @@
-use futures::{executor, try_join};
+use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    executor, try_join,
+};
 use num_complex::{Complex, Complex32};
 use rumpsteak::{
-    role::{Nil, Role, Roles, Route, ToFrom},
-    try_session, End, Label, Receive, Result, Send,
+    channel::{Bidirectional, Nil},
+    try_session, End, Message, Receive, Role, Roles, Route, Send,
 };
 use std::{
+    error::Error,
     f32::consts::PI,
     fmt::{self, Display, Formatter},
+    result,
 };
+
+type Result<T> = result::Result<T, Box<dyn Error>>;
+
+type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
 #[derive(Roles)]
 struct Roles(P0, P1, P2, P3, P4, P5, P6, P7);
 
 #[derive(Role)]
-#[message(Message)]
+#[message(Label)]
 struct P0(
-    #[route(P1)] ToFrom<P1>,
-    #[route(P2)] ToFrom<P2>,
-    #[route(P3)] Nil<P3>,
-    #[route(P4)] ToFrom<P4>,
-    #[route(P5)] Nil<P5>,
-    #[route(P6)] Nil<P6>,
-    #[route(P7)] Nil<P7>,
+    #[route(P1)] Channel,
+    #[route(P2)] Channel,
+    #[route(P3)] Nil,
+    #[route(P4)] Channel,
+    #[route(P5)] Nil,
+    #[route(P6)] Nil,
+    #[route(P7)] Nil,
 );
 
 #[derive(Role)]
-#[message(Message)]
+#[message(Label)]
 struct P1(
-    #[route(P0)] ToFrom<P0>,
-    #[route(P2)] Nil<P2>,
-    #[route(P3)] ToFrom<P3>,
-    #[route(P4)] Nil<P4>,
-    #[route(P5)] ToFrom<P5>,
-    #[route(P6)] Nil<P6>,
-    #[route(P7)] Nil<P7>,
+    #[route(P0)] Channel,
+    #[route(P2)] Nil,
+    #[route(P3)] Channel,
+    #[route(P4)] Nil,
+    #[route(P5)] Channel,
+    #[route(P6)] Nil,
+    #[route(P7)] Nil,
 );
 
 #[derive(Role)]
-#[message(Message)]
+#[message(Label)]
 struct P2(
-    #[route(P0)] ToFrom<P0>,
-    #[route(P1)] Nil<P1>,
-    #[route(P3)] ToFrom<P3>,
-    #[route(P4)] Nil<P4>,
-    #[route(P5)] Nil<P5>,
-    #[route(P6)] ToFrom<P6>,
-    #[route(P7)] Nil<P7>,
+    #[route(P0)] Channel,
+    #[route(P1)] Nil,
+    #[route(P3)] Channel,
+    #[route(P4)] Nil,
+    #[route(P5)] Nil,
+    #[route(P6)] Channel,
+    #[route(P7)] Nil,
 );
 
 #[derive(Role)]
-#[message(Message)]
+#[message(Label)]
 struct P3(
-    #[route(P0)] Nil<P0>,
-    #[route(P1)] ToFrom<P1>,
-    #[route(P2)] ToFrom<P2>,
-    #[route(P4)] Nil<P4>,
-    #[route(P5)] Nil<P5>,
-    #[route(P6)] Nil<P6>,
-    #[route(P7)] ToFrom<P7>,
+    #[route(P0)] Nil,
+    #[route(P1)] Channel,
+    #[route(P2)] Channel,
+    #[route(P4)] Nil,
+    #[route(P5)] Nil,
+    #[route(P6)] Nil,
+    #[route(P7)] Channel,
 );
 
 #[derive(Role)]
-#[message(Message)]
+#[message(Label)]
 struct P4(
-    #[route(P0)] ToFrom<P0>,
-    #[route(P1)] Nil<P1>,
-    #[route(P2)] Nil<P2>,
-    #[route(P3)] Nil<P3>,
-    #[route(P5)] ToFrom<P5>,
-    #[route(P6)] ToFrom<P6>,
-    #[route(P7)] Nil<P7>,
+    #[route(P0)] Channel,
+    #[route(P1)] Nil,
+    #[route(P2)] Nil,
+    #[route(P3)] Nil,
+    #[route(P5)] Channel,
+    #[route(P6)] Channel,
+    #[route(P7)] Nil,
 );
 
 #[derive(Role)]
-#[message(Message)]
+#[message(Label)]
 struct P5(
-    #[route(P0)] Nil<P0>,
-    #[route(P1)] ToFrom<P1>,
-    #[route(P2)] Nil<P2>,
-    #[route(P3)] Nil<P3>,
-    #[route(P4)] ToFrom<P4>,
-    #[route(P6)] Nil<P6>,
-    #[route(P7)] ToFrom<P7>,
+    #[route(P0)] Nil,
+    #[route(P1)] Channel,
+    #[route(P2)] Nil,
+    #[route(P3)] Nil,
+    #[route(P4)] Channel,
+    #[route(P6)] Nil,
+    #[route(P7)] Channel,
 );
 
 #[derive(Role)]
-#[message(Message)]
+#[message(Label)]
 struct P6(
-    #[route(P0)] Nil<P0>,
-    #[route(P1)] Nil<P1>,
-    #[route(P2)] ToFrom<P2>,
-    #[route(P3)] Nil<P3>,
-    #[route(P4)] ToFrom<P4>,
-    #[route(P5)] Nil<P5>,
-    #[route(P7)] ToFrom<P7>,
+    #[route(P0)] Nil,
+    #[route(P1)] Nil,
+    #[route(P2)] Channel,
+    #[route(P3)] Nil,
+    #[route(P4)] Channel,
+    #[route(P5)] Nil,
+    #[route(P7)] Channel,
 );
 
 #[derive(Role)]
-#[message(Message)]
+#[message(Label)]
 struct P7(
-    #[route(P0)] Nil<P0>,
-    #[route(P1)] Nil<P1>,
-    #[route(P2)] Nil<P2>,
-    #[route(P3)] ToFrom<P3>,
-    #[route(P4)] Nil<P4>,
-    #[route(P5)] ToFrom<P5>,
-    #[route(P6)] ToFrom<P6>,
+    #[route(P0)] Nil,
+    #[route(P1)] Nil,
+    #[route(P2)] Nil,
+    #[route(P3)] Channel,
+    #[route(P4)] Nil,
+    #[route(P5)] Channel,
+    #[route(P6)] Channel,
 );
 
-#[derive(Label)]
-enum Message {
+#[derive(Message)]
+enum Label {
     Value(Value),
 }
 
 struct Value(Complex32);
 
 #[rustfmt::skip]
-type Process<'q, Q, R, S, T> = Send<'q, Q, R, Value, Receive<'q, Q, R, Value, Send<'q, Q, S, Value, Receive<'q, Q, S, Value, Send<'q, Q, T, Value, Receive<'q, Q, T, Value, End<'q>>>>>>>;
+type Process<R1, R2, R3> = Send<R1, Value, Receive<R1, Value, Send<R2, Value, Receive<R2, Value, Send<R3, Value, Receive<R3, Value, End>>>>>>;
 
-async fn process<Q, R, S, T>(role: &mut Q, i: usize, input: Complex32) -> Result<Complex32>
+async fn process<R, R1, R2, R3>(role: &mut R, i: usize, input: Complex32) -> Result<Complex32>
 where
-    Q: Route<R, Route = ToFrom<R>>
-        + Route<S, Route = ToFrom<S>>
-        + Route<T, Route = ToFrom<T>>
-        + Role<Message = Message>,
-    R: Route<Q, Route = ToFrom<Q>> + Role<Message = Message>,
-    S: Route<Q, Route = ToFrom<Q>> + Role<Message = Message>,
-    T: Route<Q, Route = ToFrom<Q>> + Role<Message = Message>,
+    R: Route<R1, Route = Channel>
+        + Route<R2, Route = Channel>
+        + Route<R3, Route = Channel>
+        + Role<Message = Label>,
 {
     let angle = |k| (-2.0 * PI * Complex::i() * k as f32 / 8.0).exp();
     let angles = [angle(0), angle(2 * (i % 2)), angle(i % 4)];
@@ -137,19 +143,19 @@ where
     };
     let ops = [op(0), op(1), op(2)];
 
-    try_session(role, |s: Process<'_, Q, R, S, T>| async {
+    try_session(|s: Process<R1, R2, R3>| async {
         let x = input;
 
-        let s = s.send(Value(x))?;
-        let (Value(y), s) = s.receive().await?;
+        let s = s.send(role, Value(x)).await?;
+        let (Value(y), s) = s.receive(role).await?;
         let x = ops[0](x, y, angles[0]);
 
-        let s = s.send(Value(x))?;
-        let (Value(y), s) = s.receive().await?;
+        let s = s.send(role, Value(x)).await?;
+        let (Value(y), s) = s.receive(role).await?;
         let x = ops[1](x, y, angles[1]);
 
-        let s = s.send(Value(x))?;
-        let (Value(y), s) = s.receive().await?;
+        let s = s.send(role, Value(x)).await?;
+        let (Value(y), s) = s.receive(role).await?;
         let x = ops[2](x, y, angles[2]);
 
         Ok((x, s))
@@ -163,11 +169,10 @@ impl<'a> Display for Vector<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "[")?;
 
-        let mut input = self.0.iter();
-        if let Some(x) = input.next() {
-            write!(f, "{}", x)?;
-            for x in input {
-                write!(f, ", {}", x)?;
+        if !self.0.is_empty() {
+            writeln!(f)?;
+            for x in self.0 {
+                writeln!(f, "    {:.3},", x)?;
             }
         }
 

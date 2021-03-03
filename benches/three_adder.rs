@@ -1,29 +1,34 @@
 #![allow(clippy::many_single_char_names)]
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use futures::{executor, try_join};
-use rumpsteak::{
-    role::{Role, Roles, ToFrom},
-    try_session, End, Label, Receive, Result, Send,
+use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    executor, try_join,
 };
+use rumpsteak::{channel::Bidirectional, try_session, End, Message, Receive, Role, Roles, Send};
+use std::{error::Error, result};
+
+type Result<T> = result::Result<T, Box<dyn Error>>;
+
+type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
 #[derive(Roles)]
 struct Roles(A, B, C);
 
 #[derive(Role)]
-#[message(Message)]
-struct A(#[route(B)] ToFrom<B>, #[route(C)] ToFrom<C>);
+#[message(Label)]
+struct A(#[route(B)] Channel, #[route(C)] Channel);
 
 #[derive(Role)]
-#[message(Message)]
-struct B(#[route(A)] ToFrom<A>, #[route(C)] ToFrom<C>);
+#[message(Label)]
+struct B(#[route(A)] Channel, #[route(C)] Channel);
 
 #[derive(Role)]
-#[message(Message)]
-struct C(#[route(A)] ToFrom<A>, #[route(B)] ToFrom<B>);
+#[message(Label)]
+struct C(#[route(A)] Channel, #[route(B)] Channel);
 
-#[derive(Label)]
-enum Message {
+#[derive(Message)]
+enum Label {
     Add(Add),
     Sum(Sum),
 }
@@ -31,41 +36,47 @@ enum Message {
 struct Add(i32);
 struct Sum(i32);
 
-#[rustfmt::skip]
-type AdderA<'a> = Send<'a, A, B, Add, Receive<'a, A, B, Add, Send<'a, A, C, Add, Receive<'a, A, C, Sum, End<'a>>>>>;
+type AdderA = Send<B, Add, Receive<B, Add, Send<C, Add, Receive<C, Sum, End>>>>;
 
-#[rustfmt::skip]
-type AdderB<'b> = Receive<'b, B, A, Add, Send<'b, B, A, Add, Send<'b, B, C, Add, Receive<'b, B, C, Sum, End<'b>>>>>;
+type AdderB = Receive<A, Add, Send<A, Add, Send<C, Add, Receive<C, Sum, End>>>>;
 
-#[rustfmt::skip]
-type AdderC<'c> = Receive<'c, C, A, Add, Receive<'c, C, B, Add, Send<'c, C, A, Sum, Send<'c, C, B, Sum, End<'c>>>>>;
+type AdderC = Receive<A, Add, Receive<B, Add, Send<A, Sum, Send<B, Sum, End>>>>;
 
-async fn adder_a(s: AdderA<'_>) -> Result<((), End<'_>)> {
-    let x = 2;
-    let s = s.send(Add(x))?;
-    let (Add(y), s) = s.receive().await?;
-    let s = s.send(Add(y))?;
-    let (Sum(z), s) = s.receive().await?;
-    assert_eq!(z, 5);
-    Ok(((), s))
+async fn adder_a(role: &mut A) -> Result<()> {
+    try_session(|s: AdderA| async {
+        let x = 2;
+        let s = s.send(role, Add(x)).await?;
+        let (Add(y), s) = s.receive(role).await?;
+        let s = s.send(role, Add(y)).await?;
+        let (Sum(z), s) = s.receive(role).await?;
+        assert_eq!(z, 5);
+        Ok(((), s))
+    })
+    .await
 }
 
-async fn adder_b(s: AdderB<'_>) -> Result<((), End<'_>)> {
-    let (Add(y), s) = s.receive().await?;
-    let x = 3;
-    let s = s.send(Add(x))?;
-    let s = s.send(Add(y))?;
-    let (Sum(z), s) = s.receive().await?;
-    assert_eq!(z, 5);
-    Ok(((), s))
+async fn adder_b(role: &mut B) -> Result<()> {
+    try_session(|s: AdderB| async {
+        let (Add(y), s) = s.receive(role).await?;
+        let x = 3;
+        let s = s.send(role, Add(x)).await?;
+        let s = s.send(role, Add(y)).await?;
+        let (Sum(z), s) = s.receive(role).await?;
+        assert_eq!(z, 5);
+        Ok(((), s))
+    })
+    .await
 }
 
-async fn adder_c(s: AdderC<'_>) -> Result<((), End<'_>)> {
-    let (Add(x), s) = s.receive().await?;
-    let (Add(y), s) = s.receive().await?;
-    let z = x + y;
-    let s = s.send(Sum(z))?;
-    Ok(((), s.send(Sum(z))?))
+async fn adder_c(role: &mut C) -> Result<()> {
+    try_session(|s: AdderC| async {
+        let (Add(x), s) = s.receive(role).await?;
+        let (Add(y), s) = s.receive(role).await?;
+        let z = x + y;
+        let s = s.send(role, Sum(z)).await?;
+        Ok(((), s.send(role, Sum(z)).await?))
+    })
+    .await
 }
 
 pub fn criterion_benchmark(criterion: &mut Criterion) {
@@ -76,12 +87,7 @@ pub fn criterion_benchmark(criterion: &mut Criterion) {
             bencher.iter(|| {
                 let Roles(mut a, mut b, mut c) = Roles::default();
                 executor::block_on(async {
-                    try_join!(
-                        try_session(&mut a, adder_a),
-                        try_session(&mut b, adder_b),
-                        try_session(&mut c, adder_c),
-                    )
-                    .unwrap();
+                    try_join!(adder_a(&mut a), adder_b(&mut b), adder_c(&mut c)).unwrap();
                 });
             });
         });
@@ -90,12 +96,7 @@ pub fn criterion_benchmark(criterion: &mut Criterion) {
             let Roles(mut a, mut b, mut c) = Roles::default();
             bencher.iter(|| {
                 executor::block_on(async {
-                    try_join!(
-                        try_session(&mut a, adder_a),
-                        try_session(&mut b, adder_b),
-                        try_session(&mut c, adder_c),
-                    )
-                    .unwrap();
+                    try_join!(adder_a(&mut a), adder_b(&mut b), adder_c(&mut c)).unwrap();
                 });
             });
         });

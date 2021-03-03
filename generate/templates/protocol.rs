@@ -1,9 +1,11 @@
+use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 #[allow(unused_imports)]
 use ::rumpsteak::{
-    choice::Choice,
-    role::{Role, Roles, ToFrom},
-    Branch, End, IntoSession, Label, Receive, Select, Send,
+    channel::Bidirectional, Branch, Choice, End, IntoSession, Message, Receive, Role, Roles,
+    Select, Send,
 };
+
+type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
 #[derive(Roles)]
 #[allow(dead_code)]
@@ -14,17 +16,17 @@ struct Roles {
 }
 {% for role in roles %}
 #[derive(Role)]
-#[message(Message)]
+#[message(Label)]
 struct {{ role.camel }} {
 {%- for index in role.routes.iter() %}
     {%- let route = roles[index.0] %}
     #[route({{ route.camel }})]
-    {{ route.snake }}: ToFrom<{{ route.camel }}>,
+    {{ route.snake }}: Channel,
 {%- endfor %}
 }
 {% endfor %}
-#[derive(Label)]
-enum Message {
+#[derive(Message)]
+enum Label {
 {%- for label in labels %}
     {{ label.camel }}({{ label.camel }}),
 {%- endfor %}
@@ -35,23 +37,23 @@ struct {{ label.camel }}{% if !label.parameters.is_empty() -%}
 {%- endif %};
 {% endfor %}
 {%- for role in roles %}
-{%- for definition in role.definitions.iter().rev() %}
-{%- match definition %}
-{%- when Definition::Type with { safe, index, ty } %}
+{%- for (i, definition) in role.definitions.iter().rev().enumerate() %}
+{%- let node = role.nodes[definition.node] %}
+{%- match definition.body %}
+{%- when DefinitionBody::Type with { safe, ty } %}
 {%- if safe|copy_bool %}
-type {{ camel }}{{ role.camel }}{{ index }}<'r> = {{ ty|ty(camel, role.camel, roles, labels) }};
+type {{ camel }}{{ role.camel }}{% if i > 0 -%}{{ node }}{%- endif %} = {{ ty|ty(camel, role, roles, labels) }};
 {%- else %}
 #[derive(IntoSession)]
-#[role('r, {{ role.camel }})]
-struct {{ camel }}{{ role.camel }}{{ index }}<'r>({{ ty|ty(camel, role.camel, roles, labels) }});
+struct {{ camel }}{{ role.camel }}{% if i > 0 -%}{{ node }}{%- endif %}({{ ty|ty(camel, role, roles, labels) }});
 {%- endif %}
-{%- when Definition::Choice with { index, choices } %}
+{%- when DefinitionBody::Choice with (choices) %}
 #[derive(Choice)]
-#[role('r, {{ role.camel }})]
-enum {{ camel }}{{ role.camel }}{{ index }}<'r> {
+#[message(Label)]
+enum {{ camel }}{{ role.camel }}{{ node }} {
 {%- for choice in choices %}
     {%- let label = labels[choice.label] %}
-    {{ label.camel }}({{ label.camel }}, {{ choice.ty|ty(camel, role.camel, roles, labels) }}),
+    {{ label.camel }}({{ label.camel }}, {{ choice.ty|ty(camel, role, roles, labels) }}),
 {%- endfor %}
 }
 {%- endmatch %}

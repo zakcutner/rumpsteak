@@ -17,7 +17,7 @@ pub fn roles(input: TokenStream) -> Result<TokenStream> {
         (i + 1..fields.len()).map(move |j| {
             let left = format_ident!("role_{}_{}", i, j);
             let right = format_ident!("role_{}_{}", j, i);
-            quote! { let (#left, #right) = ::rumpsteak::role::Pair::pair(); }
+            quote! { let (#left, #right) = ::rumpsteak::channel::Pair::pair(); }
         })
     });
 

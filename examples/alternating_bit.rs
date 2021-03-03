@@ -1,23 +1,29 @@
-use futures::{executor, try_join};
-use rumpsteak::{
-    choice::Choice,
-    role::{Role, Roles, ToFrom},
-    try_session, Branch, End, Label, Result, Send,
+use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    executor, try_join,
 };
+use rumpsteak::{
+    channel::Bidirectional, try_session, Branch, Choice, End, Message, Role, Roles, Send,
+};
+use std::{error::Error, result};
+
+type Result<T> = result::Result<T, Box<dyn Error>>;
+
+type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
 #[derive(Roles)]
 struct Roles(S, R);
 
 #[derive(Role)]
-#[message(Message)]
-struct S(#[route(R)] ToFrom<R>);
+#[message(Label)]
+struct S(#[route(R)] Channel);
 
 #[derive(Role)]
-#[message(Message)]
-struct R(#[route(S)] ToFrom<S>);
+#[message(Label)]
+struct R(#[route(S)] Channel);
 
-#[derive(Label)]
-enum Message {
+#[derive(Message)]
+enum Label {
     A0(A0),
     A1(A1),
     D0(D0),
@@ -29,47 +35,44 @@ struct A1;
 struct D0(i32);
 struct D1(i32);
 
-type Sender<'s> = Send<'s, S, R, D0, Branch<'s, S, R, SenderChoice0<'s>>>;
+type Sender = Send<R, D0, Branch<R, SenderChoice0>>;
 
 #[derive(Choice)]
-#[role('s, S)]
-enum SenderChoice0<'s> {
-    A0(A0, Send<'s, S, R, D1, Branch<'s, S, R, SenderChoice1<'s>>>),
-    A1(A1, Send<'s, S, R, D0, Branch<'s, S, R, SenderChoice0<'s>>>),
+#[message(Label)]
+enum SenderChoice0 {
+    A0(A0, Send<R, D1, Branch<R, SenderChoice1>>),
+    A1(A1, Send<R, D0, Branch<R, SenderChoice0>>),
 }
 
 #[derive(Choice)]
-#[role('s, S)]
-enum SenderChoice1<'s> {
-    A0(A0, Send<'s, S, R, D1, Branch<'s, S, R, SenderChoice1<'s>>>),
-    A1(A1, End<'s>),
+#[message(Label)]
+enum SenderChoice1 {
+    A0(A0, Send<R, D1, Branch<R, SenderChoice1>>),
+    A1(A1, End),
 }
 
-type Receiver<'r> = Branch<'r, R, S, ReceiverChoice0<'r>>;
+type Receiver = Branch<S, ReceiverChoice0>;
 
 #[derive(Choice)]
-#[role('r, R)]
-enum ReceiverChoice0<'r> {
-    #[rustfmt::skip]
-    D0(D0, Send<'r, R, S, A0, Branch<'r, R, S, ReceiverChoice1<'r>>>),
-    #[rustfmt::skip]
-    D1(D1, Send<'r, R, S, A1, Branch<'r, R, S, ReceiverChoice0<'r>>>),
+#[message(Label)]
+enum ReceiverChoice0 {
+    D0(D0, Send<S, A0, Branch<S, ReceiverChoice1>>),
+    D1(D1, Send<S, A1, Branch<S, ReceiverChoice0>>),
 }
 
 #[derive(Choice)]
-#[role('r, R)]
-enum ReceiverChoice1<'r> {
-    #[rustfmt::skip]
-    D0(D0, Send<'r, R, S, A0, Branch<'r, R, S, ReceiverChoice1<'r>>>),
-    D1(D1, Send<'r, R, S, A1, End<'r>>),
+#[message(Label)]
+enum ReceiverChoice1 {
+    D0(D0, Send<S, A0, Branch<S, ReceiverChoice1>>),
+    D1(D1, Send<S, A1, End>),
 }
 
 async fn sender(role: &mut S, input: (i32, i32)) -> Result<()> {
-    try_session(role, |mut s: Sender<'_>| async {
+    try_session(|mut s: Sender| async {
         let mut s = loop {
             s = {
-                let s = s.send(D0(input.0))?;
-                match s.branch().await? {
+                let s = s.send(role, D0(input.0)).await?;
+                match s.branch(role).await? {
                     SenderChoice0::A0(A0, s) => break s,
                     SenderChoice0::A1(A1, s) => s,
                 }
@@ -78,8 +81,8 @@ async fn sender(role: &mut S, input: (i32, i32)) -> Result<()> {
 
         let s = loop {
             s = {
-                let s = s.send(D1(input.1))?;
-                match s.branch().await? {
+                let s = s.send(role, D1(input.1)).await?;
+                match s.branch(role).await? {
                     SenderChoice1::A0(A0, s) => s,
                     SenderChoice1::A1(A1, s) => break s,
                 }
@@ -92,18 +95,18 @@ async fn sender(role: &mut S, input: (i32, i32)) -> Result<()> {
 }
 
 async fn receiver(role: &mut R) -> Result<(i32, i32)> {
-    try_session(role, |mut s: Receiver<'_>| async {
+    try_session(|mut s: Receiver| async {
         let (x, mut s) = loop {
-            s = match s.branch().await? {
-                ReceiverChoice0::D0(D0(x), s) => break (x, s.send(A0)?),
-                ReceiverChoice0::D1(D1(_), s) => s.send(A1)?,
+            s = match s.branch(role).await? {
+                ReceiverChoice0::D0(D0(x), s) => break (x, s.send(role, A0).await?),
+                ReceiverChoice0::D1(D1(_), s) => s.send(role, A1).await?,
             }
         };
 
         let (y, s) = loop {
-            s = match s.branch().await? {
-                ReceiverChoice1::D0(D0(_), s) => s.send(A0)?,
-                ReceiverChoice1::D1(D1(y), s) => break (y, s.send(A1)?),
+            s = match s.branch(role).await? {
+                ReceiverChoice1::D0(D0(_), s) => s.send(role, A0).await?,
+                ReceiverChoice1::D1(D1(y), s) => break (y, s.send(role, A1).await?),
             }
         };
 

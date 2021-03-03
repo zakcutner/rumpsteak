@@ -1,13 +1,12 @@
-use crate::parse::{self, Role};
+use crate::parse;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse2, spanned::Spanned, Data, DeriveInput, Error, Fields, Result};
+use syn::{parse2, spanned::Spanned, Data, DeriveInput, Error, Fields, Result, Type};
 
 pub fn choice(input: TokenStream) -> Result<TokenStream> {
     let input = parse2::<DeriveInput>(input)?;
 
-    let role = parse::attribute::<Role>(&input.attrs, "role", input.span())?;
-    let role_ty = &role.ty;
+    let message = parse::attribute::<Type>(&input.attrs, "message", input.span())?;
 
     let ident = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -37,7 +36,7 @@ pub fn choice(input: TokenStream) -> Result<TokenStream> {
         }?;
 
         output.extend(quote! {
-            impl #impl_generics ::rumpsteak::choice::Internal<#role, #label> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::rumpsteak::Choice<#label> for #ident #ty_generics #where_clause {
                 type Session = #session;
             }
         });
@@ -45,15 +44,13 @@ pub fn choice(input: TokenStream) -> Result<TokenStream> {
 
     let idents = variants.iter().map(|variant| &variant.ident);
     output.extend(quote! {
-        impl #impl_generics ::rumpsteak::choice::External<#role> for #ident #ty_generics #where_clause {
-            fn choice(
-                state: ::rumpsteak::State<#role>,
-                message: <#role_ty as ::rumpsteak::role::Role>::Message
-            ) -> Option<Self> {
-                type Message<R> = <R as ::rumpsteak::role::Role>::Message;
-
+        impl #impl_generics ::rumpsteak::Choices<#message> for #ident #ty_generics #where_clause {
+            fn unwrap(state: ::rumpsteak::State, message: #message) -> Option<Self> {
                 match message {
-                    #(Message::<#role_ty>::#idents(label) => Some(Self::#idents(label, state.into_session())),)*
+                    #(#message::#idents(label) => Some(Self::#idents(
+                        label,
+                        ::rumpsteak::Session::from_state(state)
+                    )),)*
                     _ => None,
                 }
             }

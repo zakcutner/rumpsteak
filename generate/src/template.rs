@@ -2,11 +2,13 @@ use super::Direction;
 use askama::Template;
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug)]
 pub(crate) struct Route(pub usize);
 
+#[derive(Debug)]
 pub(crate) enum Type {
     End,
-    Definition(usize),
+    Node(usize),
     Message {
         direction: Direction,
         role: usize,
@@ -16,14 +18,27 @@ pub(crate) enum Type {
     Choice {
         direction: Direction,
         role: usize,
-        index: usize,
+        node: usize,
     },
+}
+
+impl Type {
+    pub(crate) fn is_choice(&self) -> bool {
+        matches!(
+            self,
+            Self::Choice {
+                direction: _,
+                role: _,
+                node: _
+            }
+        )
+    }
 }
 
 struct TypeFormatter<'a> {
     ty: &'a Type,
     name: &'a str,
-    role: &'a str,
+    role: &'a Role,
     roles: &'a [Role],
     labels: &'a [Label],
 }
@@ -46,72 +61,86 @@ impl<'a> TypeFormatter<'a> {
     fn label(&self, label: &usize) -> &str {
         &self.labels[*label].camel
     }
+
+    fn node(&self, node: &usize) -> &str {
+        &self.role.nodes[*node]
+    }
 }
 
 impl Display for TypeFormatter<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match &self.ty {
+        match self.ty {
             Type::End => write!(f, "End"),
-            Type::Definition(index) => write!(f, "{}{}{}<'r>", self.name, self.role, index),
+            Type::Node(node) if *node > 0 => {
+                write!(f, "{}{}{}", self.name, self.role.camel, self.node(node))
+            }
+            Type::Node(_) => write!(f, "{}{}", self.name, self.role.camel),
             Type::Message {
                 direction,
                 role,
                 label,
                 next,
             } => {
-                let ty = match direction {
-                    Direction::Send => "Send",
-                    Direction::Receive => "Receive",
-                };
-
-                let (role, other) = (self.role, self.role(role));
-                let (label, next) = (self.label(label), self.with(next));
-                write!(f, "{}<'r, {}, {}, {}, {}>", ty, role, other, label, next)
+                let (other, label, next) = (self.role(role), self.label(label), self.with(next));
+                match direction {
+                    Direction::Send => write!(f, "Send<{}, {}, {}>", other, label, next),
+                    Direction::Receive => write!(f, "Receive<{}, {}, {}>", other, label, next),
+                }
             }
             Type::Choice {
                 direction,
                 role,
-                index,
+                node,
             } => {
-                let ty = match direction {
-                    Direction::Send => "Select",
-                    Direction::Receive => "Branch",
-                };
-
-                let (role, other, name) = (self.role, self.role(role), self.name);
-                write!(
-                    f,
-                    "{}<'r, {}, {}, {}{}{}<'r>>",
-                    ty, role, other, name, role, index
-                )
+                let other = self.role(role);
+                let (name, role, node) = (self.name, &self.role.camel, self.node(node));
+                match direction {
+                    Direction::Send => {
+                        write!(f, "Select<{}, {}{}{}>", other, name, role, node)
+                    }
+                    Direction::Receive => {
+                        write!(f, "Branch<{}, {}{}{}>", other, name, role, node)
+                    }
+                }
             }
         }
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Choice {
     pub label: usize,
     pub ty: Type,
 }
 
-pub(crate) enum Definition {
-    Type { safe: bool, index: usize, ty: Type },
-    Choice { index: usize, choices: Vec<Choice> },
+#[derive(Debug)]
+pub(crate) enum DefinitionBody {
+    Type { safe: bool, ty: Type },
+    Choice(Vec<Choice>),
 }
 
+#[derive(Debug)]
+pub(crate) struct Definition {
+    pub node: usize,
+    pub body: DefinitionBody,
+}
+
+#[derive(Debug)]
 pub(crate) struct Role {
     pub camel: String,
     pub snake: String,
+    pub nodes: Vec<String>,
     pub routes: Vec<Route>,
     pub definitions: Vec<Definition>,
 }
 
+#[derive(Debug)]
 pub(crate) struct Label {
     pub camel: String,
     pub parameters: Vec<String>,
 }
 
-#[derive(Template)]
+#[derive(Debug, Template)]
 #[template(path = "protocol.rs", escape = "none")]
 pub struct Protocol {
     pub(crate) camel: String,
@@ -124,15 +153,15 @@ mod filters {
     use askama::Result;
 
     #[allow(clippy::unnecessary_wraps)]
-    pub(super) fn copy_bool(t: &bool) -> Result<bool> {
-        Ok(*t)
+    pub(super) fn copy_bool(b: &bool) -> Result<bool> {
+        Ok(*b)
     }
 
     #[allow(clippy::unnecessary_wraps)]
     pub(super) fn ty<'a>(
         ty: &'a Type,
         name: &'a str,
-        role: &'a str,
+        role: &'a Role,
         roles: &'a [Role],
         labels: &'a [Label],
     ) -> Result<TypeFormatter<'a>> {

@@ -1,30 +1,37 @@
-use futures::{future::LocalBoxFuture, FutureExt};
+use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    future::LocalBoxFuture,
+    FutureExt,
+};
 use rand::Rng;
 use rumpsteak::{
-    choice::Choice,
-    role::{Role, Roles, ToFrom},
-    try_session, Branch, End, Label, Receive, Result, Select, Send,
+    channel::Bidirectional, try_session, Branch, Choice, End, Message, Receive, Role, Roles,
+    Select, Send,
 };
-use std::time::Duration;
+use std::{error::Error, result, time::Duration};
 use tokio::{time, try_join};
+
+type Result<T> = result::Result<T, Box<dyn Error>>;
+
+type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
 #[derive(Roles)]
 struct Roles(U, D, E);
 
 #[derive(Role)]
-#[message(Message)]
-struct U(#[route(D)] ToFrom<D>, #[route(E)] ToFrom<E>);
+#[message(Label)]
+struct U(#[route(D)] Channel, #[route(E)] Channel);
 
 #[derive(Role)]
-#[message(Message)]
-struct D(#[route(U)] ToFrom<U>, #[route(E)] ToFrom<E>);
+#[message(Label)]
+struct D(#[route(U)] Channel, #[route(E)] Channel);
 
 #[derive(Role)]
-#[message(Message)]
-struct E(#[route(U)] ToFrom<U>, #[route(D)] ToFrom<D>);
+#[message(Label)]
+struct E(#[route(U)] Channel, #[route(D)] Channel);
 
-#[derive(Label)]
-enum Message {
+#[derive(Message)]
+enum Label {
     Close(Close),
     CloseDoor(CloseDoor),
     DoorClosed(DoorClosed),
@@ -46,58 +53,55 @@ struct OpenDoor;
 struct Reset;
 struct Stop;
 
-type User<'u> = Select<'u, U, E, UserChoice<'u>>;
+type User = Select<E, UserChoice>;
 
 #[derive(Choice)]
-#[role('u, U)]
-enum UserChoice<'u> {
-    CloseDoor(CloseDoor, User<'u>),
-    OpenDoor(OpenDoor, User<'u>),
+#[message(Label)]
+enum UserChoice {
+    CloseDoor(CloseDoor, User),
+    OpenDoor(OpenDoor, User),
 }
 
-type Door<'d> = Branch<'d, D, E, DoorInit<'d>>;
+type Door = Branch<E, DoorInit>;
 
 #[derive(Choice)]
-#[role('d, D)]
-enum DoorInit<'d> {
-    #[rustfmt::skip]
-    Close(Close, Send<'d, D, E, DoorClosed, Branch<'d, D, E, DoorReset<'d>>>),
-    #[rustfmt::skip]
-    Open(Open, Send<'d, D, E, DoorOpened, Branch<'d, D, E, DoorReset<'d>>>),
-    Reset(Reset, Door<'d>),
-    Stop(Stop, Door<'d>),
+#[message(Label)]
+enum DoorInit {
+    Close(Close, Send<E, DoorClosed, Branch<E, DoorReset>>),
+    Open(Open, Send<E, DoorOpened, Branch<E, DoorReset>>),
+    Reset(Reset, Door),
+    Stop(Stop, Door),
 }
 
 #[derive(Choice)]
-#[role('d, D)]
-enum DoorReset<'d> {
-    Close(Close, Branch<'d, D, E, DoorReset<'d>>),
-    Open(Open, Branch<'d, D, E, DoorReset<'d>>),
-    Reset(Reset, Door<'d>),
-    Stop(Stop, Branch<'d, D, E, DoorReset<'d>>),
+#[message(Label)]
+enum DoorReset {
+    Close(Close, Branch<E, DoorReset>),
+    Open(Open, Branch<E, DoorReset>),
+    Reset(Reset, Door),
+    Stop(Stop, Branch<E, DoorReset>),
 }
 
-type Elevator<'e> = Send<'e, E, D, Reset, Branch<'e, E, U, ElevatorClosed<'e>>>;
+type Elevator = Send<D, Reset, Branch<U, ElevatorClosed>>;
 
 #[derive(Choice)]
-#[role('e, E)]
-enum ElevatorClosed<'e> {
-    CloseDoor(CloseDoor, Branch<'e, E, U, ElevatorClosed<'e>>),
-    OpenDoor(OpenDoor, ElevatorOpening<'e>),
+#[message(Label)]
+enum ElevatorClosed {
+    CloseDoor(CloseDoor, Branch<U, ElevatorClosed>),
+    OpenDoor(OpenDoor, ElevatorOpening),
 }
 
-type ElevatorOpening<'e> = Send<'e, E, D, Open, Receive<'e, E, D, DoorOpened, ElevatorOpened<'e>>>;
+type ElevatorOpening = Send<D, Open, Receive<D, DoorOpened, ElevatorOpened>>;
 
-#[rustfmt::skip]
-type ElevatorOpened<'e> = Send<'e, E, D, Reset, Send<'e, E, D, Close, Send<'e, E, D, Stop, Branch<'e, E, D, ElevatorStopping<'e>>>>>;
+type ElevatorOpened = Send<D, Reset, Send<D, Close, Send<D, Stop, Branch<D, ElevatorStopping>>>>;
 
 #[derive(Choice)]
-#[role('e, E)]
+#[message(Label)]
 #[allow(clippy::enum_variant_names)]
-enum ElevatorStopping<'e> {
-    DoorStopped(DoorStopped, ElevatorOpening<'e>),
-    DoorOpened(DoorOpened, ElevatorOpened<'e>),
-    DoorClosed(DoorClosed, Elevator<'e>),
+enum ElevatorStopping {
+    DoorStopped(DoorStopped, ElevatorOpening),
+    DoorOpened(DoorOpened, ElevatorOpened),
+    DoorClosed(DoorClosed, Elevator),
 }
 
 enum Never {}
@@ -108,14 +112,14 @@ async fn sleep(mut rng: impl Rng) {
 
 async fn user(role: &mut U) -> Result<Never> {
     let mut rng = rand::thread_rng();
-    try_session(role, |mut s: User<'_>| async {
+    try_session(|mut s: User| async {
         loop {
             s = if rng.gen() {
                 println!("user: close");
-                s.select(CloseDoor)?
+                s.select(role, CloseDoor).await?
             } else {
                 println!("user: open");
-                s.select(OpenDoor)?
+                s.select(role, OpenDoor).await?
             };
 
             sleep(&mut rng).await;
@@ -125,10 +129,10 @@ async fn user(role: &mut U) -> Result<Never> {
 }
 
 async fn door(role: &mut D) -> Result<Never> {
-    try_session(role, |mut s: Door<'_>| async {
-        async fn reset<'d>(mut s: Branch<'d, D, E, DoorReset<'d>>) -> Result<Door<'d>> {
+    try_session(|mut s: Door| async {
+        async fn reset(mut s: Branch<E, DoorReset>, role: &mut D) -> Result<Door> {
             loop {
-                s = match s.branch().await? {
+                s = match s.branch(role).await? {
                     DoorReset::Close(Close, s)
                     | DoorReset::Open(Open, s)
                     | DoorReset::Stop(Stop, s) => s,
@@ -138,14 +142,14 @@ async fn door(role: &mut D) -> Result<Never> {
         }
 
         loop {
-            s = match s.branch().await? {
+            s = match s.branch(role).await? {
                 DoorInit::Close(Close, s) => {
                     println!("door: close");
-                    reset(s.send(DoorClosed)?).await?
+                    reset(s.send(role, DoorClosed).await?, role).await?
                 }
                 DoorInit::Open(Open, s) => {
                     println!("door: open");
-                    reset(s.send(DoorOpened)?).await?
+                    reset(s.send(role, DoorOpened).await?, role).await?
                 }
                 DoorInit::Reset(Reset, s) | DoorInit::Stop(Stop, s) => s,
             };
@@ -155,61 +159,65 @@ async fn door(role: &mut D) -> Result<Never> {
 }
 
 async fn elevator(role: &mut E) -> Result<Never> {
-    fn opened<'e>(
-        s: ElevatorOpened<'e>,
-        mut rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End<'_>)>> {
+    fn opened<'a>(
+        s: ElevatorOpened,
+        role: &'a mut E,
+        mut rng: impl Rng + 'a,
+    ) -> LocalBoxFuture<'a, Result<(Never, End)>> {
         async move {
-            let s = s.send(Reset)?;
+            let s = s.send(role, Reset).await?;
             sleep(&mut rng).await;
 
-            let s = s.send(Close)?.send(Stop)?;
-            match s.branch().await? {
-                ElevatorStopping::DoorStopped(DoorStopped, s) => opening(s, rng).await,
-                ElevatorStopping::DoorOpened(DoorOpened, s) => opened(s, rng).await,
-                ElevatorStopping::DoorClosed(DoorClosed, s) => elevator(s, rng).await,
+            let s = s.send(role, Close).await?.send(role, Stop).await?;
+            match s.branch(role).await? {
+                ElevatorStopping::DoorStopped(DoorStopped, s) => opening(s, role, rng).await,
+                ElevatorStopping::DoorOpened(DoorOpened, s) => opened(s, role, rng).await,
+                ElevatorStopping::DoorClosed(DoorClosed, s) => elevator(s, role, rng).await,
             }
         }
         .boxed_local()
     }
 
-    fn opening<'e>(
-        s: ElevatorOpening<'e>,
-        rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End<'_>)>> {
+    fn opening<'a>(
+        s: ElevatorOpening,
+        role: &'a mut E,
+        rng: impl Rng + 'a,
+    ) -> LocalBoxFuture<'a, Result<(Never, End)>> {
         async move {
-            let (DoorOpened, s) = s.send(Open)?.receive().await?;
-            opened(s, rng).await
+            let (DoorOpened, s) = s.send(role, Open).await?.receive(role).await?;
+            opened(s, role, rng).await
         }
         .boxed_local()
     }
 
-    fn closed<'e>(
-        s: Branch<'e, E, U, ElevatorClosed<'e>>,
-        rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End<'_>)>> {
+    fn closed<'a>(
+        s: Branch<U, ElevatorClosed>,
+        role: &'a mut E,
+        rng: impl Rng + 'a,
+    ) -> LocalBoxFuture<'a, Result<(Never, End)>> {
         async move {
-            match s.branch().await? {
-                ElevatorClosed::CloseDoor(CloseDoor, s) => closed(s, rng).await,
-                ElevatorClosed::OpenDoor(OpenDoor, s) => opening(s, rng).await,
+            match s.branch(role).await? {
+                ElevatorClosed::CloseDoor(CloseDoor, s) => closed(s, role, rng).await,
+                ElevatorClosed::OpenDoor(OpenDoor, s) => opening(s, role, rng).await,
             }
         }
         .boxed_local()
     }
 
-    fn elevator<'e>(
-        s: Elevator<'e>,
-        rng: impl Rng + 'e,
-    ) -> LocalBoxFuture<'e, Result<(Never, End<'_>)>> {
+    fn elevator<'a>(
+        s: Elevator,
+        role: &'a mut E,
+        rng: impl Rng + 'a,
+    ) -> LocalBoxFuture<'a, Result<(Never, End)>> {
         async move {
-            let s = s.send(Reset)?;
-            closed(s, rng).await
+            let s = s.send(role, Reset).await?;
+            closed(s, role, rng).await
         }
         .boxed_local()
     }
 
     let rng = rand::thread_rng();
-    try_session(role, |s| async { elevator(s, rng).await }).await
+    try_session(|s| async { elevator(s, role, rng).await }).await
 }
 
 #[tokio::main(flavor = "current_thread")]

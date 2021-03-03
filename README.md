@@ -41,25 +41,30 @@ rumpsteak = "0.1"
 ## Example
 
 ```rust
-use futures::{executor, try_join};
-use rumpsteak::{
-    role::{Role, Roles, ToFrom},
-    try_session, End, Label, Receive, Result, Send,
+use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    executor, try_join,
 };
+use rumpsteak::{channel::Bidirectional, try_session, End, Message, Receive, Role, Roles, Send};
+use std::{error::Error, result};
+
+type Result<T> = result::Result<T, Box<dyn Error>>;
+
+type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
 #[derive(Roles)]
 struct Roles(C, S);
 
 #[derive(Role)]
-#[message(Message)]
-struct C(#[route(S)] ToFrom<S>);
+#[message(Label)]
+struct C(#[route(S)] Channel);
 
 #[derive(Role)]
-#[message(Message)]
-struct S(#[route(C)] ToFrom<C>);
+#[message(Label)]
+struct S(#[route(C)] Channel);
 
-#[derive(Label)]
-enum Message {
+#[derive(Message)]
+enum Label {
     Add(Add),
     Sum(Sum),
 }
@@ -67,25 +72,25 @@ enum Message {
 struct Add(i32);
 struct Sum(i32);
 
-type Client<'c> = Send<'c, C, S, Add, Send<'c, C, S, Add, Receive<'c, C, S, Sum, End<'c>>>>;
+type Client = Send<S, Add, Send<S, Add, Receive<S, Sum, End>>>;
 
-type Server<'s> = Receive<'s, S, C, Add, Receive<'s, S, C, Add, Send<'s, S, C, Sum, End<'s>>>>;
+type Server = Receive<C, Add, Receive<C, Add, Send<C, Sum, End>>>;
 
 async fn client(role: &mut C, x: i32, y: i32) -> Result<i32> {
-    try_session(role, |s: Client<'_>| async {
-        let s = s.send(Add(x))?;
-        let s = s.send(Add(y))?;
-        let (Sum(z), s) = s.receive().await?;
+    try_session(|s: Client| async {
+        let s = s.send(role, Add(x)).await?;
+        let s = s.send(role, Add(y)).await?;
+        let (Sum(z), s) = s.receive(role).await?;
         Ok((z, s))
     })
     .await
 }
 
 async fn server(role: &mut S) -> Result<()> {
-    try_session(role, |s: Server<'_>| async {
-        let (Add(x), s) = s.receive().await?;
-        let (Add(y), s) = s.receive().await?;
-        let s = s.send(Sum(x + y))?;
+    try_session(|s: Server| async {
+        let (Add(x), s) = s.receive(role).await?;
+        let (Add(y), s) = s.receive(role).await?;
+        let s = s.send(role, Sum(x + y)).await?;
         Ok(((), s))
     })
     .await

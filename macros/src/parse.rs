@@ -1,33 +1,5 @@
-use proc_macro2::{Span, TokenStream};
-use quote::ToTokens;
-use syn::{
-    parse::{Parse, ParseStream},
-    Attribute, Error, Lifetime, Result, Token, Type,
-};
-
-pub struct Role {
-    pub lifetime: Lifetime,
-    pub comma: Token![,],
-    pub ty: Type,
-}
-
-impl Parse for Role {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(Self {
-            lifetime: input.parse()?,
-            comma: input.parse()?,
-            ty: input.parse()?,
-        })
-    }
-}
-
-impl ToTokens for Role {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.lifetime.to_tokens(tokens);
-        self.comma.to_tokens(tokens);
-        self.ty.to_tokens(tokens);
-    }
-}
+use proc_macro2::Span;
+use syn::{parse::Parse, Attribute, Error, Result};
 
 pub fn optional_attribute<T: Parse>(attrs: &[Attribute], ident: &str) -> Result<Option<T>> {
     let mut output = None;

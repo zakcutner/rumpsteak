@@ -182,6 +182,7 @@ impl<'a> Digraph<'a> {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Tree<'a> {
     pub roles: Vec<(&'a str, Graph<'a>)>,
     pub labels: IndexMap<&'a str, Vec<&'a str>>,
