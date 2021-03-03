@@ -1,6 +1,11 @@
 use super::Direction;
 use askama::Template;
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    fs::File,
+    io::{self, Write},
+    path::Path,
+};
 
 #[derive(Debug)]
 pub(crate) struct Route(pub usize);
@@ -146,6 +151,12 @@ pub struct Protocol {
     pub(crate) camel: String,
     pub(crate) roles: Vec<Role>,
     pub(crate) labels: Vec<Label>,
+}
+
+impl Protocol {
+    pub fn write_to_file(&self, path: impl AsRef<Path>) -> io::Result<()> {
+        write!(File::create(path)?, "{}", self)
+    }
 }
 
 mod filters {

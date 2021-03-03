@@ -1,6 +1,6 @@
 use clap::Clap;
 use rumpsteak_generate::Builder;
-use std::{error::Error, fs::File, io::Write, process::exit};
+use std::{error::Error, process::exit};
 
 #[derive(Clap)]
 #[clap(version, author, about)]
@@ -28,7 +28,7 @@ fn generate() -> Result<(), Box<dyn Error>> {
     let protocol = builder.generate()?;
     match arguments.output.as_str() {
         "-" => print!("{}", protocol),
-        path => write!(File::create(path)?, "{}", protocol)?,
+        path => protocol.write_to_file(path)?,
     }
 
     Ok(())

@@ -1,9 +1,11 @@
 mod parser;
 mod template;
 
+pub use self::template::Protocol;
+
 use self::{
     parser::Tree,
-    template::{Choice, Definition, DefinitionBody, Label, Protocol, Role, Route, Type},
+    template::{Choice, Definition, DefinitionBody, Label, Role, Route, Type},
 };
 use heck::{CamelCase, SnakeCase};
 use indexmap::IndexMap;
@@ -52,7 +54,7 @@ impl GraphEdge {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Builder<'a, P: AsRef<Path>> {
     name: &'a str,
     roles: Vec<P>,
