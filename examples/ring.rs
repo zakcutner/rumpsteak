@@ -1,5 +1,5 @@
 use futures::{channel::mpsc, executor, try_join};
-use rumpsteak::{try_session, End, Message, Receive, Role, Roles, Send};
+use rumpsteak::{session, try_session, End, Message, Receive, Role, Roles, Send};
 use std::{error::Error, result};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
@@ -29,17 +29,20 @@ enum Label {
 
 struct Value(i32);
 
+#[session]
 type RingA = Send<B, Value, Receive<C, Value, End>>;
 
+#[session]
 type RingB = Receive<A, Value, Send<C, Value, End>>;
 
+#[session]
 type RingC = Receive<B, Value, Send<A, Value, End>>;
 
 async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
     let x = input;
-    try_session(|s: RingA| async {
-        let s = s.send(role, Value(x)).await?;
-        let (Value(y), s) = s.receive(role).await?;
+    try_session(role, |s: RingA<'_, _>| async {
+        let s = s.send(Value(x)).await?;
+        let (Value(y), s) = s.receive().await?;
         Ok((x + y, s))
     })
     .await
@@ -47,9 +50,9 @@ async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
 
 async fn ring_b(role: &mut B, input: i32) -> Result<i32> {
     let x = input;
-    try_session(|s: RingB| async {
-        let (Value(y), s) = s.receive(role).await?;
-        let s = s.send(role, Value(x)).await?;
+    try_session(role, |s: RingB<'_, _>| async {
+        let (Value(y), s) = s.receive().await?;
+        let s = s.send(Value(x)).await?;
         Ok((x + y, s))
     })
     .await
@@ -57,9 +60,9 @@ async fn ring_b(role: &mut B, input: i32) -> Result<i32> {
 
 async fn ring_c(role: &mut C, input: i32) -> Result<i32> {
     let x = input;
-    try_session(|s: RingC| async {
-        let (Value(y), s) = s.receive(role).await?;
-        let s = s.send(role, Value(x)).await?;
+    try_session(role, |s: RingC<'_, _>| async {
+        let (Value(y), s) = s.receive().await?;
+        let s = s.send(Value(x)).await?;
         Ok((x + y, s))
     })
     .await

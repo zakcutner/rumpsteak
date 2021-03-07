@@ -45,7 +45,9 @@ use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     executor, try_join,
 };
-use rumpsteak::{channel::Bidirectional, try_session, End, Message, Receive, Role, Roles, Send};
+use rumpsteak::{
+    channel::Bidirectional, session, try_session, End, Message, Receive, Role, Roles, Send,
+};
 use std::{error::Error, result};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
@@ -72,25 +74,27 @@ enum Label {
 struct Add(i32);
 struct Sum(i32);
 
+#[session]
 type Client = Send<S, Add, Send<S, Add, Receive<S, Sum, End>>>;
 
+#[session]
 type Server = Receive<C, Add, Receive<C, Add, Send<C, Sum, End>>>;
 
 async fn client(role: &mut C, x: i32, y: i32) -> Result<i32> {
-    try_session(|s: Client| async {
-        let s = s.send(role, Add(x)).await?;
-        let s = s.send(role, Add(y)).await?;
-        let (Sum(z), s) = s.receive(role).await?;
+    try_session(role, |s: Client<'_, _>| async {
+        let s = s.send(Add(x)).await?;
+        let s = s.send(Add(y)).await?;
+        let (Sum(z), s) = s.receive().await?;
         Ok((z, s))
     })
     .await
 }
 
 async fn server(role: &mut S) -> Result<()> {
-    try_session(|s: Server| async {
-        let (Add(x), s) = s.receive(role).await?;
-        let (Add(y), s) = s.receive(role).await?;
-        let s = s.send(role, Sum(x + y)).await?;
+    try_session(role, |s: Server<'_, _>| async {
+        let (Add(x), s) = s.receive().await?;
+        let (Add(y), s) = s.receive().await?;
+        let s = s.send(Sum(x + y)).await?;
         Ok(((), s))
     })
     .await

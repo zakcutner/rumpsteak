@@ -1,18 +1,10 @@
 use proc_macro::TokenStream;
 
-mod choice;
 mod message;
 mod parse;
 mod role;
 mod roles;
 mod session;
-
-#[proc_macro_derive(Choice, attributes(message))]
-pub fn choice(input: TokenStream) -> TokenStream {
-    choice::choice(input.into())
-        .unwrap_or_else(|err| err.to_compile_error())
-        .into()
-}
 
 #[proc_macro_derive(Message)]
 pub fn message(input: TokenStream) -> TokenStream {
@@ -35,9 +27,9 @@ pub fn roles(input: TokenStream) -> TokenStream {
         .into()
 }
 
-#[proc_macro_derive(IntoSession)]
-pub fn into_session(input: TokenStream) -> TokenStream {
-    session::into_session(input.into())
+#[proc_macro_attribute]
+pub fn session(attr: TokenStream, input: TokenStream) -> TokenStream {
+    session::session(attr.into(), input.into())
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

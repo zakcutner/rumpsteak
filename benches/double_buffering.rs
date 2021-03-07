@@ -5,7 +5,7 @@ use futures::{
 };
 use rumpsteak::{
     channel::{Bidirectional, Nil},
-    try_session, End, Message, Receive, Role, Roles, Send,
+    session, try_session, End, Message, Receive, Role, Roles, Send,
 };
 use std::{error::Error, result};
 
@@ -37,26 +37,31 @@ enum Label {
 struct Ready;
 struct Copy(i32);
 
+#[session]
 type Source = Receive<K, Ready, Send<K, Copy, Receive<K, Ready, Send<K, Copy, End>>>>;
 
+#[session]
 #[rustfmt::skip]
 type Kernel = Send<S, Ready, Receive<S, Copy, Receive<T, Ready, Send<T, Copy, Send<S, Ready, Receive<S, Copy, Receive<T, Ready, Send<T, Copy, End>>>>>>>>;
 
+#[session]
 #[rustfmt::skip]
 type KernelOptimizedWeak = Send<S, Ready, Receive<S, Copy, Send<S, Ready, Receive<T, Ready, Send<T, Copy, Receive<S, Copy, Receive<T, Ready, Send<T, Copy, End>>>>>>>>;
 
+#[session]
 #[rustfmt::skip]
 type KernelOptimized = Send<S, Ready, Send<S, Ready, Receive<S, Copy, Receive<T, Ready, Send<T, Copy, Receive<S, Copy, Receive<T, Ready, Send<T, Copy, End>>>>>>>>;
 
+#[session]
 type Sink = Send<K, Ready, Receive<K, Copy, Send<K, Ready, Receive<K, Copy, End>>>>;
 
 async fn source(role: &mut S, input: (i32, i32)) -> Result<()> {
-    try_session(|s: Source| async {
-        let (Ready, s) = s.receive(role).await?;
-        let s = s.send(role, Copy(input.0)).await?;
+    try_session(role, |s: Source<'_, _>| async {
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(input.0)).await?;
 
-        let (Ready, s) = s.receive(role).await?;
-        let s = s.send(role, Copy(input.1)).await?;
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(input.1)).await?;
 
         Ok(((), s))
     })
@@ -64,16 +69,16 @@ async fn source(role: &mut S, input: (i32, i32)) -> Result<()> {
 }
 
 async fn kernel(role: &mut K) -> Result<()> {
-    try_session(|s: Kernel| async {
-        let s = s.send(role, Ready).await?;
-        let (Copy(x), s) = s.receive(role).await?;
-        let (Ready, s) = s.receive(role).await?;
-        let s = s.send(role, Copy(x)).await?;
+    try_session(role, |s: Kernel<'_, _>| async {
+        let s = s.send(Ready).await?;
+        let (Copy(x), s) = s.receive().await?;
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(x)).await?;
 
-        let s = s.send(role, Ready).await?;
-        let (Copy(y), s) = s.receive(role).await?;
-        let (Ready, s) = s.receive(role).await?;
-        let s = s.send(role, Copy(y)).await?;
+        let s = s.send(Ready).await?;
+        let (Copy(y), s) = s.receive().await?;
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(y)).await?;
 
         Ok(((), s))
     })
@@ -81,16 +86,16 @@ async fn kernel(role: &mut K) -> Result<()> {
 }
 
 async fn kernel_optimized_weak(role: &mut K) -> Result<()> {
-    try_session(|s: KernelOptimizedWeak| async {
-        let s = s.send(role, Ready).await?;
-        let (Copy(x), s) = s.receive(role).await?;
-        let s = s.send(role, Ready).await?;
-        let (Ready, s) = s.receive(role).await?;
-        let s = s.send(role, Copy(x)).await?;
+    try_session(role, |s: KernelOptimizedWeak<'_, _>| async {
+        let s = s.send(Ready).await?;
+        let (Copy(x), s) = s.receive().await?;
+        let s = s.send(Ready).await?;
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(x)).await?;
 
-        let (Copy(y), s) = s.receive(role).await?;
-        let (Ready, s) = s.receive(role).await?;
-        let s = s.send(role, Copy(y)).await?;
+        let (Copy(y), s) = s.receive().await?;
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(y)).await?;
 
         Ok(((), s))
     })
@@ -98,17 +103,17 @@ async fn kernel_optimized_weak(role: &mut K) -> Result<()> {
 }
 
 async fn kernel_optimized(role: &mut K) -> Result<()> {
-    try_session(|s: KernelOptimized| async {
-        let s = s.send(role, Ready).await?;
-        let s = s.send(role, Ready).await?;
+    try_session(role, |s: KernelOptimized<'_, _>| async {
+        let s = s.send(Ready).await?;
+        let s = s.send(Ready).await?;
 
-        let (Copy(x), s) = s.receive(role).await?;
-        let (Ready, s) = s.receive(role).await?;
-        let s = s.send(role, Copy(x)).await?;
+        let (Copy(x), s) = s.receive().await?;
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(x)).await?;
 
-        let (Copy(y), s) = s.receive(role).await?;
-        let (Ready, s) = s.receive(role).await?;
-        let s = s.send(role, Copy(y)).await?;
+        let (Copy(y), s) = s.receive().await?;
+        let (Ready, s) = s.receive().await?;
+        let s = s.send(Copy(y)).await?;
 
         Ok(((), s))
     })
@@ -116,12 +121,12 @@ async fn kernel_optimized(role: &mut K) -> Result<()> {
 }
 
 async fn sink(role: &mut T) -> Result<(i32, i32)> {
-    try_session(|s: Sink| async {
-        let s = s.send(role, Ready).await?;
-        let (Copy(x), s) = s.receive(role).await?;
+    try_session(role, |s: Sink<'_, _>| async {
+        let s = s.send(Ready).await?;
+        let (Copy(x), s) = s.receive().await?;
 
-        let s = s.send(role, Ready).await?;
-        let (Copy(y), s) = s.receive(role).await?;
+        let s = s.send(Ready).await?;
+        let (Copy(y), s) = s.receive().await?;
 
         Ok(((x, y), s))
     })

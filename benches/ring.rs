@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use futures::channel::mpsc;
-use rumpsteak::{try_session, End, Message, Receive, Role, Roles, Send};
+use rumpsteak::{session, try_session, End, Message, Receive, Role, Roles, Send};
 use std::{error::Error, result, time::Duration};
 use tokio::{runtime, time, try_join};
 
@@ -31,14 +31,19 @@ enum Label {
 
 struct Value(i32);
 
+#[session]
 type RingA = Send<B, Value, Receive<C, Value, End>>;
 
+#[session]
 type RingB = Receive<A, Value, Send<C, Value, End>>;
 
+#[session]
 type RingBOptimized = Send<C, Value, Receive<A, Value, End>>;
 
+#[session]
 type RingC = Receive<B, Value, Send<A, Value, End>>;
 
+#[session]
 type RingCOptimized = Send<A, Value, Receive<B, Value, End>>;
 
 async fn sleep() {
@@ -48,9 +53,9 @@ async fn sleep() {
 
 async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
     let x = input;
-    try_session(|s: RingA| async {
-        let s = s.send(role, Value(x)).await?;
-        let (Value(y), s) = s.receive(role).await?;
+    try_session(role, |s: RingA<'_, _>| async {
+        let s = s.send(Value(x)).await?;
+        let (Value(y), s) = s.receive().await?;
         sleep().await;
         Ok((x + y, s))
     })
@@ -59,10 +64,10 @@ async fn ring_a(role: &mut A, input: i32) -> Result<i32> {
 
 async fn ring_b(role: &mut B, input: i32) -> Result<i32> {
     let x = input;
-    try_session(|s: RingB| async {
-        let (Value(y), s) = s.receive(role).await?;
+    try_session(role, |s: RingB<'_, _>| async {
+        let (Value(y), s) = s.receive().await?;
         sleep().await;
-        let s = s.send(role, Value(x)).await?;
+        let s = s.send(Value(x)).await?;
         Ok((x + y, s))
     })
     .await
@@ -70,9 +75,9 @@ async fn ring_b(role: &mut B, input: i32) -> Result<i32> {
 
 async fn ring_b_optimized(role: &mut B, input: i32) -> Result<i32> {
     let x = input;
-    try_session(|s: RingBOptimized| async {
-        let s = s.send(role, Value(x)).await?;
-        let (Value(y), s) = s.receive(role).await?;
+    try_session(role, |s: RingBOptimized<'_, _>| async {
+        let s = s.send(Value(x)).await?;
+        let (Value(y), s) = s.receive().await?;
         sleep().await;
         Ok((x + y, s))
     })
@@ -81,10 +86,10 @@ async fn ring_b_optimized(role: &mut B, input: i32) -> Result<i32> {
 
 async fn ring_c(role: &mut C, input: i32) -> Result<i32> {
     let x = input;
-    try_session(|s: RingC| async {
-        let (Value(y), s) = s.receive(role).await?;
+    try_session(role, |s: RingC<'_, _>| async {
+        let (Value(y), s) = s.receive().await?;
         sleep().await;
-        let s = s.send(role, Value(x)).await?;
+        let s = s.send(Value(x)).await?;
         Ok((x + y, s))
     })
     .await
@@ -92,9 +97,9 @@ async fn ring_c(role: &mut C, input: i32) -> Result<i32> {
 
 async fn ring_c_optimized(role: &mut C, input: i32) -> Result<i32> {
     let x = input;
-    try_session(|s: RingCOptimized| async {
-        let s = s.send(role, Value(x)).await?;
-        let (Value(y), s) = s.receive(role).await?;
+    try_session(role, |s: RingCOptimized<'_, _>| async {
+        let s = s.send(Value(x)).await?;
+        let (Value(y), s) = s.receive().await?;
         sleep().await;
         Ok((x + y, s))
     })

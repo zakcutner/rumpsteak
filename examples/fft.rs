@@ -5,7 +5,7 @@ use futures::{
 use num_complex::{Complex, Complex32};
 use rumpsteak::{
     channel::{Bidirectional, Nil},
-    try_session, End, Message, Receive, Role, Roles, Route, Send,
+    session, try_session, End, Message, Receive, Role, Roles, Route, Send,
 };
 use std::{
     error::Error,
@@ -124,6 +124,7 @@ enum Label {
 
 struct Value(Complex32);
 
+#[session]
 #[rustfmt::skip]
 type Process<R1, R2, R3> = Send<R1, Value, Receive<R1, Value, Send<R2, Value, Receive<R2, Value, Send<R3, Value, Receive<R3, Value, End>>>>>>;
 
@@ -143,19 +144,19 @@ where
     };
     let ops = [op(0), op(1), op(2)];
 
-    try_session(|s: Process<R1, R2, R3>| async {
+    try_session(role, |s: Process<'_, _, R1, R2, R3>| async {
         let x = input;
 
-        let s = s.send(role, Value(x)).await?;
-        let (Value(y), s) = s.receive(role).await?;
+        let s = s.send(Value(x)).await?;
+        let (Value(y), s) = s.receive().await?;
         let x = ops[0](x, y, angles[0]);
 
-        let s = s.send(role, Value(x)).await?;
-        let (Value(y), s) = s.receive(role).await?;
+        let s = s.send(Value(x)).await?;
+        let (Value(y), s) = s.receive().await?;
         let x = ops[1](x, y, angles[1]);
 
-        let s = s.send(role, Value(x)).await?;
-        let (Value(y), s) = s.receive(role).await?;
+        let s = s.send(Value(x)).await?;
+        let (Value(y), s) = s.receive().await?;
         let x = ops[2](x, y, angles[2]);
 
         Ok((x, s))

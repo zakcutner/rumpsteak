@@ -1,8 +1,7 @@
 use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 #[allow(unused_imports)]
 use ::rumpsteak::{
-    channel::Bidirectional, Branch, Choice, End, IntoSession, Message, Receive, Role, Roles,
-    Select, Send,
+    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send,
 };
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
@@ -39,17 +38,15 @@ struct {{ label.camel }}{% if !label.parameters.is_empty() -%}
 {%- for role in roles %}
 {%- for (i, definition) in role.definitions.iter().rev().enumerate() %}
 {%- let node = role.nodes[definition.node] %}
+#[session]
 {%- match definition.body %}
 {%- when DefinitionBody::Type with { safe, ty } %}
 {%- if safe|copy_bool %}
 type {{ camel }}{{ role.camel }}{% if i > 0 -%}{{ node }}{%- endif %} = {{ ty|ty(camel, role, roles, labels) }};
 {%- else %}
-#[derive(IntoSession)]
 struct {{ camel }}{{ role.camel }}{% if i > 0 -%}{{ node }}{%- endif %}({{ ty|ty(camel, role, roles, labels) }});
 {%- endif %}
 {%- when DefinitionBody::Choice with (choices) %}
-#[derive(Choice)]
-#[message(Label)]
 enum {{ camel }}{{ role.camel }}{{ node }} {
 {%- for choice in choices %}
     {%- let label = labels[choice.label] %}
