@@ -6,29 +6,25 @@ use tokio::{runtime, time, try_join};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-type Sender = mpsc::UnboundedSender<Label>;
-type Receiver = mpsc::UnboundedReceiver<Label>;
+type Sender = mpsc::UnboundedSender<Value>;
+type Receiver = mpsc::UnboundedReceiver<Value>;
 
 #[derive(Roles)]
 struct Roles(A, B, C);
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct A(#[route(B)] Sender, #[route(C)] Receiver);
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct B(#[route(A)] Receiver, #[route(C)] Sender);
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct C(#[route(A)] Sender, #[route(B)] Receiver);
 
 #[derive(Message)]
-enum Label {
-    Value(Value),
-}
-
 struct Value(i32);
 
 #[session]

@@ -16,13 +16,13 @@ use std::{
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
-type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
+type Channel = Bidirectional<UnboundedSender<Value>, UnboundedReceiver<Value>>;
 
 #[derive(Roles)]
 struct Roles(P0, P1, P2, P3, P4, P5, P6, P7);
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct P0(
     #[route(P1)] Channel,
     #[route(P2)] Channel,
@@ -34,7 +34,7 @@ struct P0(
 );
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct P1(
     #[route(P0)] Channel,
     #[route(P2)] Nil,
@@ -46,7 +46,7 @@ struct P1(
 );
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct P2(
     #[route(P0)] Channel,
     #[route(P1)] Nil,
@@ -58,7 +58,7 @@ struct P2(
 );
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct P3(
     #[route(P0)] Nil,
     #[route(P1)] Channel,
@@ -70,7 +70,7 @@ struct P3(
 );
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct P4(
     #[route(P0)] Channel,
     #[route(P1)] Nil,
@@ -82,7 +82,7 @@ struct P4(
 );
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct P5(
     #[route(P0)] Nil,
     #[route(P1)] Channel,
@@ -94,7 +94,7 @@ struct P5(
 );
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct P6(
     #[route(P0)] Nil,
     #[route(P1)] Nil,
@@ -106,7 +106,7 @@ struct P6(
 );
 
 #[derive(Role)]
-#[message(Label)]
+#[message(Value)]
 struct P7(
     #[route(P0)] Nil,
     #[route(P1)] Nil,
@@ -118,10 +118,6 @@ struct P7(
 );
 
 #[derive(Message)]
-enum Label {
-    Value(Value),
-}
-
 struct Value(Complex32);
 
 #[session]
@@ -133,7 +129,7 @@ where
     R: Route<R1, Route = Channel>
         + Route<R2, Route = Channel>
         + Route<R3, Route = Channel>
-        + Role<Message = Label>,
+        + Role<Message = Value>,
 {
     let angle = |k| (-2.0 * PI * Complex::i() * k as f32 / 8.0).exp();
     let angles = [angle(0), angle(2 * (i % 2)), angle(i % 4)];

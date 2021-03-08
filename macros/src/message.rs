@@ -8,9 +8,23 @@ pub fn message(input: TokenStream) -> Result<TokenStream> {
     let ident = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
+    if let Data::Struct(_) = &input.data {
+        return Ok(quote! {
+            impl #impl_generics ::rumpsteak::Message<Self> for #ident #ty_generics #where_clause {
+                fn upcast(label: Self) -> Self {
+                    label
+                }
+
+                fn downcast(self) -> ::core::result::Result<Self, Self> {
+                    ::core::result::Result::Ok(self)
+                }
+            }
+        });
+    }
+
     let variants = match &input.data {
         Data::Enum(input) => Ok(&input.variants),
-        _ => Err(Error::new_spanned(&input, "expected an enum")),
+        _ => Err(Error::new_spanned(&input, "expected a struct or enum")),
     }?;
 
     let mut output = TokenStream::new();
@@ -39,8 +53,8 @@ pub fn message(input: TokenStream) -> Result<TokenStream> {
 
                 fn downcast(self) -> ::core::result::Result<#ty, Self> {
                     match self {
-                        Self::#variant_ident(label) => Ok(label),
-                        _ => Err(self),
+                        Self::#variant_ident(label) => ::core::result::Result::Ok(label),
+                        _ => ::core::result::Result::Err(self),
                     }
                 }
             }
