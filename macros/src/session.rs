@@ -152,6 +152,23 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
         });
     }
 
+    #[cfg(feature = "serialize")]
+    {
+        let mut generics = input.generics.clone();
+        let where_clause = generics.make_where_clause();
+        where_clause.predicates.push(parse_quote!('__r: 'static));
+        where_clause.predicates.push(parse_quote!(__R: 'static));
+
+        let (_, _, where_clause) = generics.split_for_impl();
+        output.extend(quote! {
+            impl #impl_generics ::rumpsteak::serialize::SerializeChoices for #ident #ty_generics #where_clause {
+                fn serialize_choices(mut s: ::rumpsteak::serialize::ChoicesSerializer<'_>) {
+                    #(s.serialize_choice::<#labels, #tys>();)*
+                }
+            }
+        });
+    }
+
     let mut generics = input.generics.clone();
     generics.make_where_clause().predicates.push(parse_quote! {
         __R::Message: #(::rumpsteak::Message<#labels> +)*
