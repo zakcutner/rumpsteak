@@ -6,7 +6,7 @@ use syn::{
     Index, Item, ItemEnum, ItemStruct, ItemType, PathArguments, Result, Type,
 };
 
-fn punctuated_append<T, P: Default>(left: &mut Punctuated<T, P>, mut right: Punctuated<T, P>) {
+fn punctuated_prepend<T, P: Default>(left: &mut Punctuated<T, P>, mut right: Punctuated<T, P>) {
     right.extend(mem::take(left));
     *left = right;
 }
@@ -40,7 +40,7 @@ fn augment_type(mut ty: &mut Type) {
         };
 
         let is_empty = args.is_empty();
-        punctuated_append(args, parse_quote!('__r, __R));
+        punctuated_prepend(args, parse_quote!('__r, __R));
 
         if is_empty {
             break;
@@ -54,7 +54,7 @@ fn augment_type(mut ty: &mut Type) {
 }
 
 fn session_type(mut input: ItemType) -> TokenStream {
-    punctuated_append(
+    punctuated_prepend(
         &mut input.generics.params,
         parse_quote!('__r, __R: ::rumpsteak::Role),
     );
@@ -65,7 +65,7 @@ fn session_type(mut input: ItemType) -> TokenStream {
 fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
     let ident = &input.ident;
 
-    punctuated_append(
+    punctuated_prepend(
         &mut input.generics.params,
         parse_quote!('__r, __R: ::rumpsteak::Role),
     );
@@ -111,7 +111,7 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
         return Err(Error::new_spanned(&input.variants, message));
     }
 
-    punctuated_append(
+    punctuated_prepend(
         &mut input.generics.params,
         parse_quote!('__r, __R: ::rumpsteak::Role),
     );
@@ -146,7 +146,7 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
     let mut output = TokenStream::new();
     for (label, ty) in labels.iter().zip(&tys) {
         output.extend(quote! {
-            impl #impl_generics ::rumpsteak::Choice<'__r, __R, #label> for #ident #ty_generics #where_clause {
+            impl #impl_generics ::rumpsteak::Choice<'__r, #label> for #ident #ty_generics #where_clause {
                 type Session = #ty;
             }
         });
@@ -159,11 +159,13 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
 
     let (_, _, where_clause) = generics.split_for_impl();
     output.extend(quote! {
-        impl #impl_generics ::rumpsteak::Choices<'__r, __R> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::rumpsteak::Choices<'__r> for #ident #ty_generics #where_clause {
+            type Role = __R;
+
             fn downcast(
-                state: ::rumpsteak::State<'__r, __R>,
-                message: __R::Message,
-            ) -> ::core::result::Result<Self, __R::Message> {
+                state: ::rumpsteak::State<'__r, Self::Role>,
+                message: <Self::Role as Role>::Message,
+            ) -> ::core::result::Result<Self, <Self::Role as Role>::Message> {
                 #(let message = match ::rumpsteak::Message::downcast(message) {
                     Ok(label) => {
                         return Ok(Self::#idents(
