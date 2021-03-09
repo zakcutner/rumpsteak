@@ -1,16 +1,14 @@
 #![cfg(feature = "serialize")]
 
 use crate::{Branch, End, FromState, IntoSession, Receive, Role, Select, Send};
-use petgraph::graph::NodeIndex;
+use petgraph::{dot::Dot, graph::NodeIndex};
 use std::{
     any::{type_name, TypeId},
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
 };
 
-pub type Graph = petgraph::Graph<Node, Label>;
-
-pub enum Direction {
+enum Direction {
     Send,
     Receive,
 }
@@ -24,7 +22,7 @@ impl Display for Direction {
     }
 }
 
-pub enum Node {
+enum Node {
     Choices {
         role: &'static str,
         direction: Direction,
@@ -41,11 +39,19 @@ impl Display for Node {
     }
 }
 
-pub struct Label(&'static str);
+struct Label(&'static str);
 
 impl Display for Label {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+pub struct Graph(petgraph::Graph<Node, Label>);
+
+impl Display for Graph {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", Dot::new(&self.0))
     }
 }
 
@@ -58,7 +64,7 @@ pub struct Serializer {
 impl Serializer {
     fn add_node_index(&mut self, node: NodeIndex) {
         if let Some((previous, edge)) = self.previous.take() {
-            self.graph.add_edge(previous, node, edge);
+            self.graph.0.add_edge(previous, node, edge);
         }
     }
 
@@ -70,7 +76,7 @@ impl Serializer {
                 None
             }
             Entry::Vacant(entry) => {
-                let node = self.graph.add_node(node);
+                let node = self.graph.0.add_node(node);
                 entry.insert(node);
                 self.add_node_index(node);
                 Some(node)
@@ -176,7 +182,7 @@ impl<Q: Role + 'static, R: 'static, C: SerializeChoices + 'static> Serialize
 
 pub fn serialize<S: Serialize>() -> Graph {
     let mut serializer = Serializer {
-        graph: Graph::new(),
+        graph: Graph(petgraph::Graph::new()),
         history: HashMap::new(),
         previous: None,
     };
