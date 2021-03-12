@@ -1,12 +1,29 @@
 #![cfg(feature = "serialize")]
 
 use crate::{Branch, End, FromState, IntoSession, Receive, Role, Select, Send};
-use petgraph::{dot::Dot, graph::NodeIndex};
+use petgraph::{dot::Dot, graph::NodeIndex, visit::EdgeRef};
 use std::{
     any::{type_name, TypeId},
+    cell::RefCell,
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
 };
+
+type Graph = petgraph::Graph<Node, Label>;
+
+struct Type {
+    id: TypeId,
+    name: &'static str,
+}
+
+impl Type {
+    fn new<T: 'static>() -> Self {
+        Self {
+            id: TypeId::of::<T>(),
+            name: type_name::<T>(),
+        }
+    }
+}
 
 enum Direction {
     Send,
@@ -23,35 +40,35 @@ impl Display for Direction {
 }
 
 enum Node {
-    Choices {
-        role: &'static str,
-        direction: Direction,
-    },
+    Choices { role: Type, direction: Direction },
     End,
 }
 
 impl Display for Node {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Choices { role, direction } => write!(f, "{}{}", role, direction),
+            Self::Choices { role, direction } => write!(f, "{}{}", role.name, direction),
             Self::End => Ok(()),
         }
     }
 }
 
-struct Label(&'static str);
+struct Label(Type);
 
 impl Display for Label {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.0.name)
     }
 }
 
-pub struct Graph(petgraph::Graph<Node, Label>);
+pub struct Serialized {
+    role: Type,
+    graph: Graph,
+}
 
-impl Display for Graph {
+impl Display for Serialized {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", Dot::new(&self.0))
+        write!(f, "{}", Dot::new(&self.graph))
     }
 }
 
@@ -64,7 +81,7 @@ pub struct Serializer {
 impl Serializer {
     fn add_node_index(&mut self, node: NodeIndex) {
         if let Some((previous, edge)) = self.previous.take() {
-            self.graph.0.add_edge(previous, node, edge);
+            self.graph.add_edge(previous, node, edge);
         }
     }
 
@@ -76,7 +93,7 @@ impl Serializer {
                 None
             }
             Entry::Vacant(entry) => {
-                let node = self.graph.0.add_node(node);
+                let node = self.graph.add_node(node);
                 entry.insert(node);
                 self.add_node_index(node);
                 Some(node)
@@ -93,7 +110,7 @@ impl Serializer {
         direction: Direction,
     ) -> Option<ChoicesSerializer> {
         self.add_node::<S>(Node::Choices {
-            role: type_name::<R>(),
+            role: Type::new::<R>(),
             direction,
         })
         .map(move |node| ChoicesSerializer {
@@ -110,7 +127,7 @@ pub struct ChoicesSerializer<'a> {
 
 impl ChoicesSerializer<'_> {
     pub fn serialize_choice<L: 'static, S: Serialize>(&mut self) {
-        self.serializer.previous = Some((self.node, Label(type_name::<L>())));
+        self.serializer.previous = Some((self.node, Label(Type::new::<L>())));
         S::serialize(&mut self.serializer);
     }
 }
@@ -180,13 +197,97 @@ impl<Q: Role + 'static, R: 'static, C: SerializeChoices + 'static> Serialize
     }
 }
 
-pub fn serialize<S: Serialize>() -> Graph {
+pub fn serialize<S: FromState<'static> + Serialize>() -> Serialized {
     let mut serializer = Serializer {
-        graph: Graph(petgraph::Graph::new()),
+        graph: petgraph::Graph::new(),
         history: HashMap::new(),
         previous: None,
     };
 
     S::serialize(&mut serializer);
-    serializer.graph
+    Serialized {
+        role: Type::new::<S::Role>(),
+        graph: serializer.graph,
+    }
+}
+
+struct PetrifyFormatter<'a> {
+    serialized: &'a Serialized,
+    roles: &'a HashMap<TypeId, usize>,
+    labels: &'a RefCell<HashMap<TypeId, usize>>,
+}
+
+impl<'a> PetrifyFormatter<'a> {
+    fn new(
+        serialized: &'a Serialized,
+        roles: &'a HashMap<TypeId, usize>,
+        labels: &'a RefCell<HashMap<TypeId, usize>>,
+    ) -> Self {
+        Self {
+            serialized,
+            roles,
+            labels,
+        }
+    }
+
+    fn label(&self, label: &Label) -> usize {
+        let mut labels = self.labels.borrow_mut();
+        let next_index = labels.len();
+        *labels.entry(label.0.id).or_insert(next_index)
+    }
+}
+
+impl Display for PetrifyFormatter<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let graph = &self.serialized.graph;
+        assert!(graph.node_count() > 0);
+
+        writeln!(f, ".outputs")?;
+        writeln!(f, ".state graph")?;
+
+        for edge in graph.edge_references() {
+            write!(f, "s{} ", edge.source().index())?;
+            let (role, direction) = match &graph[edge.source()] {
+                Node::Choices { role, direction } => (self.roles[&role.id], direction),
+                _ => unreachable!(),
+            };
+
+            write!(f, "{} {} l{} ", role, direction, self.label(edge.weight()))?;
+            writeln!(f, "s{}", edge.target().index())?;
+        }
+
+        writeln!(f, ".marking s0")?;
+        write!(f, ".end")
+    }
+}
+
+pub struct Petrify<'a> {
+    serialized: &'a [Serialized],
+    roles: HashMap<TypeId, usize>,
+}
+
+impl<'a> Petrify<'a> {
+    pub fn new(serialized: &'a [Serialized]) -> Self {
+        let roles = serialized.iter().enumerate().map(|(i, s)| (s.role.id, i));
+        Self {
+            serialized,
+            roles: roles.collect(),
+        }
+    }
+}
+
+impl Display for Petrify<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let (mut serialized_iter, labels) = (self.serialized.iter(), RefCell::new(HashMap::new()));
+        if let Some(serialized) = serialized_iter.next() {
+            PetrifyFormatter::new(serialized, &self.roles, &labels).fmt(f)?;
+            for serialized in serialized_iter {
+                writeln!(f)?;
+                writeln!(f)?;
+                PetrifyFormatter::new(serialized, &self.roles, &labels).fmt(f)?;
+            }
+        }
+
+        Ok(())
+    }
 }
