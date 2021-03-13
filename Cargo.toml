@@ -35,7 +35,7 @@ thiserror = "1.0"
 criterion = "0.3"
 futures = { version = "0.3", features = ["thread-pool"] }
 mpstthree = { git = "https://github.com/NicolasLagaillardie/mpst_rust_github", rev = "ad4983d9" }
-num-complex = "0.3"
+num-complex = "0.4"
 rand = { version = "0.8", features = ["small_rng"] }
 rumpsteak-oneshot = { path = "oneshot" }
 tokio = { version = "1.0", features = ["macros", "rt", "time"] }
