@@ -86,13 +86,15 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
     };
 
     let output = quote! {
-        impl #impl_generics ::rumpsteak::FromState<'__r, __R> for #ident #ty_generics #where_clause {
-            fn from_state(state: ::rumpsteak::State<'__r, __R>) -> Self {
+        impl #impl_generics ::rumpsteak::FromState<'__r> for #ident #ty_generics #where_clause {
+            type Role = __R;
+
+            fn from_state(state: ::rumpsteak::State<'__r, Self::Role>) -> Self {
                 Self { #field_ident: ::rumpsteak::FromState::from_state(state) }
             }
         }
 
-        impl #impl_generics ::rumpsteak::IntoSession<'__r, __R> for #ident #ty_generics #where_clause {
+        impl #impl_generics ::rumpsteak::IntoSession<'__r> for #ident #ty_generics #where_clause {
             type Session = #field_ty;
 
             fn into_session(self) -> Self::Session {
