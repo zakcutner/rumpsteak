@@ -1,3 +1,5 @@
+#![allow(clippy::upper_case_acronyms)]
+
 use super::{Direction, Graph, GraphEdge, GraphNode, Result};
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use pest::{
