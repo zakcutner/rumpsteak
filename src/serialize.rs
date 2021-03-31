@@ -1,6 +1,6 @@
 #![cfg(feature = "serialize")]
 
-use crate::{Branch, End, FromState, IntoSession, Receive, Role, Select, Send};
+use crate::{Branch, End, FromState, Receive, Role, Select, Send};
 use petgraph::{dot::Dot, graph::NodeIndex, visit::EdgeRef};
 use std::{
     any::{type_name, TypeId},
@@ -138,15 +138,6 @@ pub trait Serialize: 'static {
 
 pub trait SerializeChoices: 'static {
     fn serialize_choices(s: ChoicesSerializer<'_>);
-}
-
-impl<S: IntoSession<'static> + 'static> Serialize for S
-where
-    S::Session: Serialize,
-{
-    fn serialize(s: &mut Serializer) {
-        S::Session::serialize(s);
-    }
 }
 
 impl<R: Role + 'static> Serialize for End<'static, R> {

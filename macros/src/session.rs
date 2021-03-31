@@ -85,7 +85,8 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
         None => Index::from(0).to_token_stream(),
     };
 
-    let output = quote! {
+    let mut output = TokenStream::new();
+    output.extend(quote! {
         impl #impl_generics ::rumpsteak::FromState<'__r> for #ident #ty_generics #where_clause {
             type Role = __R;
 
@@ -101,7 +102,24 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
                 self.#field_ident
             }
         }
-    };
+    });
+
+    #[cfg(feature = "serialize")]
+    {
+        let mut generics = input.generics.clone();
+        let where_clause = generics.make_where_clause();
+        where_clause.predicates.push(parse_quote!('__r: 'static));
+        where_clause.predicates.push(parse_quote!(__R: 'static));
+
+        let (_, _, where_clause) = generics.split_for_impl();
+        output.extend(quote! {
+            impl #impl_generics ::rumpsteak::serialize::Serialize for #ident #ty_generics #where_clause {
+                fn serialize(s: &mut ::rumpsteak::serialize::Serializer) {
+                    <#field_ty as ::rumpsteak::serialize::Serialize>::serialize(s);
+                }
+            }
+        });
+    }
 
     Ok(quote!(#input #output))
 }
