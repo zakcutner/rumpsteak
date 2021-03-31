@@ -157,7 +157,7 @@ impl<R: Role + 'static> Serialize for End<'static, R> {
 
 impl<Q: Role + 'static, R: 'static, L: 'static, S> Serialize for Send<'static, Q, R, L, S>
 where
-    S: FromState<'static, Role = Q> + Serialize + 'static,
+    S: FromState<'static, Role = Q> + Serialize,
 {
     fn serialize(s: &mut Serializer) {
         if let Some(mut s) = s.serialize_choices::<Self, R>(Direction::Send) {
@@ -168,7 +168,7 @@ where
 
 impl<Q: Role + 'static, R: 'static, L: 'static, S> Serialize for Receive<'static, Q, R, L, S>
 where
-    S: FromState<'static, Role = Q> + Serialize + 'static,
+    S: FromState<'static, Role = Q> + Serialize,
 {
     fn serialize(s: &mut Serializer) {
         if let Some(mut s) = s.serialize_choices::<Self, R>(Direction::Receive) {
@@ -177,9 +177,7 @@ where
     }
 }
 
-impl<Q: Role + 'static, R: 'static, C: SerializeChoices + 'static> Serialize
-    for Select<'static, Q, R, C>
-{
+impl<Q: Role + 'static, R: 'static, C: SerializeChoices> Serialize for Select<'static, Q, R, C> {
     fn serialize(s: &mut Serializer) {
         if let Some(s) = s.serialize_choices::<Self, R>(Direction::Send) {
             C::serialize_choices(s);
@@ -187,9 +185,7 @@ impl<Q: Role + 'static, R: 'static, C: SerializeChoices + 'static> Serialize
     }
 }
 
-impl<Q: Role + 'static, R: 'static, C: SerializeChoices + 'static> Serialize
-    for Branch<'static, Q, R, C>
-{
+impl<Q: Role + 'static, R: 'static, C: SerializeChoices> Serialize for Branch<'static, Q, R, C> {
     fn serialize(s: &mut Serializer) {
         if let Some(s) = s.serialize_choices::<Self, R>(Direction::Receive) {
             C::serialize_choices(s);
