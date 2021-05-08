@@ -22,6 +22,11 @@ name = "ring"
 harness = false
 
 [[bench]]
+name = "subtyping"
+harness = false
+required-features = ["serialize"]
+
+[[bench]]
 name = "three_adder"
 harness = false
 
@@ -43,6 +48,12 @@ tokio = { version = "1.0", features = ["macros", "rt", "time"] }
 
 [features]
 serialize = ["bitvec", "petgraph", "rumpsteak-macros/serialize"]
+
+[profile.release]
+debug = true
+
+[profile.bench]
+debug = true
 
 [workspace]
 members = ["generate", "macros", "oneshot"]
