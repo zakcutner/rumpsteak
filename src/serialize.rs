@@ -6,11 +6,10 @@ use fmt::Debug;
 use petgraph::{dot::Dot, graph::NodeIndex, visit::EdgeRef};
 use std::{
     any::{type_name, TypeId},
-    borrow::Cow,
     cell::RefCell,
-    collections::{hash_map::Entry, HashMap, VecDeque},
-    convert::identity,
+    collections::{hash_map::Entry, HashMap},
     fmt::{self, Display, Formatter},
+    mem,
 };
 
 type Graph = petgraph::Graph<Node, Label>;
@@ -323,8 +322,8 @@ impl<T> Pair<T> {
         Pair::new(&mut self.left, &mut self.right)
     }
 
-    fn swap(self) -> Self {
-        Self::new(self.right, self.left)
+    fn swap(&mut self) {
+        mem::swap(&mut self.left, &mut self.right)
     }
 
     fn zip<U>(self, other: Pair<U>) -> Pair<(T, U)> {
@@ -336,7 +335,7 @@ impl<T> Pair<T> {
     }
 
     fn into_iter(self) -> impl Iterator<Item = T> {
-        self.map(Option::Some)
+        self.map(Some)
     }
 
     fn iter(&self) -> impl Iterator<Item = &T> {
@@ -408,14 +407,95 @@ impl Display for Prefix {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 struct Prefixes {
-    queue: VecDeque<Prefix>,
+    prefixes: Vec<(bool, Prefix)>,
+    start: usize,
+    removed: Vec<usize>,
+}
+
+#[derive(Clone, Copy)]
+struct PrefixIndex(usize);
+
+#[derive(Debug, PartialEq, Eq)]
+struct PrefixesSnapshot {
+    size: usize,
+    start: usize,
+    removed: usize,
+}
+
+impl Prefixes {
+    fn is_empty(&self) -> bool {
+        self.start >= self.prefixes.len()
+    }
+
+    fn first(&self) -> Option<&Prefix> {
+        if let Some((removed, prefix)) = self.prefixes.get(self.start) {
+            assert!(!removed);
+            return Some(&prefix);
+        }
+
+        None
+    }
+
+    fn push(&mut self, prefix: Prefix) {
+        self.prefixes.push((false, prefix));
+    }
+
+    fn remove_first(&mut self) {
+        assert!(matches!(self.prefixes.get(self.start), Some((false, _))));
+        self.start += 1;
+        while let Some((true, _)) = self.prefixes.get(self.start) {
+            self.start += 1;
+        }
+    }
+
+    fn remove(&mut self, PrefixIndex(i): PrefixIndex) {
+        if i == self.start {
+            self.remove_first();
+            return;
+        }
+
+        let (removed, _) = &mut self.prefixes[i];
+        assert!(!*removed);
+        *removed = true;
+        self.removed.push(i);
+    }
+
+    fn snapshot(&self) -> PrefixesSnapshot {
+        PrefixesSnapshot {
+            size: self.prefixes.len(),
+            start: self.start,
+            removed: self.removed.len(),
+        }
+    }
+
+    fn restore(&mut self, snapshot: &PrefixesSnapshot) {
+        for &i in self.removed.get(snapshot.removed..).unwrap_or_default() {
+            let (removed, _) = &mut self.prefixes[i];
+            assert!(*removed);
+            *removed = false;
+        }
+
+        assert!(snapshot.removed <= self.removed.len());
+        self.removed.truncate(snapshot.removed);
+
+        assert!(snapshot.size <= self.prefixes.len());
+        self.prefixes.truncate(snapshot.size);
+
+        assert!(snapshot.start <= self.start);
+        self.start = snapshot.start;
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (PrefixIndex, &Prefix)> {
+        let prefixes = self.prefixes.iter().enumerate().skip(self.start);
+        prefixes.filter_map(|(i, (removed, prefix))| (!removed).then(|| (PrefixIndex(i), prefix)))
+    }
 }
 
 impl Display for Prefixes {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut prefixes = self.queue.iter();
+        let mut prefixes = self.iter().map(|(_, prefix)| prefix);
         if let Some(prefix) = prefixes.next() {
             write!(f, "{}", prefix)?;
             for prefix in prefixes {
@@ -429,6 +509,7 @@ impl Display for Prefixes {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Quantifier {
     All,
     Any,
@@ -438,6 +519,7 @@ struct SubtypeVisitor<'a> {
     graphs: Pair<&'a Graph>,
     history: BitMatrix,
     visits: Pair<Box<[usize]>>,
+    prefixes: Pair<Prefixes>,
 }
 
 impl SubtypeVisitor<'_> {
@@ -445,53 +527,58 @@ impl SubtypeVisitor<'_> {
     fn unroll<I: Iterator<Item = (NodeIndex, Prefix)>, const SWAP: bool>(
         &mut self,
         mut edges: Pair<I>,
-        mut prefixes: Pair<Cow<Prefixes>>,
         mut quantifiers: Pair<Quantifier>,
     ) -> bool {
+        let mut prefixes = self.prefixes.as_ref();
         if SWAP {
-            edges = edges.swap();
-            prefixes = prefixes.swap();
-            quantifiers = quantifiers.swap();
+            prefixes.swap();
+            edges.swap();
+            quantifiers.swap();
         }
 
-        // TODO: use a write log and snapshots to avoid cloning.
-        let (left_prefixes, right_prefixes) = prefixes.as_mut().map(Cow::to_mut).into_tuple();
-        let mut right_edges = edges.right.map(|(n, p)| (n, Some(p))).collect::<Vec<_>>();
+        let right_edges = edges.right.collect::<Vec<_>>();
+        let snapshots = prefixes.map(Prefixes::snapshot);
 
-        let mut output = edges.left.map(|(left_node, left_prefix)| {
-            left_prefixes.queue.push_back(left_prefix);
-            let mut output = right_edges.iter_mut().map(|(right_node, right_prefix)| {
-                right_prefixes.queue.push_back(right_prefix.take().unwrap());
-                let mut nodes = Pair::new(left_node, *right_node);
-                let mut prefixes = Pair::new(&*left_prefixes, &*right_prefixes).map(Cow::Borrowed);
+        for (left_node, left_prefix) in edges.left {
+            let mut prefixes = self.prefixes.as_mut();
+            if SWAP {
+                prefixes.swap();
+            }
 
+            prefixes.left.restore(&snapshots.left);
+            prefixes.left.push(left_prefix);
+
+            let mut output = quantifiers.right == Quantifier::All;
+            for (right_node, right_prefix) in &right_edges {
+                let mut prefixes = self.prefixes.as_mut();
                 if SWAP {
-                    nodes = nodes.swap();
-                    prefixes = prefixes.swap();
+                    prefixes.swap();
                 }
 
-                let output = self.visit(nodes, prefixes);
+                prefixes.right.restore(&snapshots.right);
+                prefixes.right.push(right_prefix.clone());
 
-                *right_prefix = Some(right_prefixes.queue.pop_back().unwrap());
-                output
-            });
+                let mut nodes = Pair::new(left_node, *right_node);
+                if SWAP {
+                    nodes.swap();
+                }
 
-            let output = match quantifiers.right {
-                Quantifier::All => output.all(identity),
-                Quantifier::Any => output.any(identity),
-            };
+                output = self.visit(nodes);
 
-            left_prefixes.queue.pop_back().unwrap();
-            output
-        });
+                if output == (quantifiers.right == Quantifier::Any) {
+                    break;
+                }
+            }
 
-        match quantifiers.left {
-            Quantifier::All => output.all(identity),
-            Quantifier::Any => output.any(identity),
+            if output == (quantifiers.left == Quantifier::Any) {
+                return output;
+            }
         }
+
+        quantifiers.left == Quantifier::All
     }
 
-    fn visit(&mut self, nodes: Pair<NodeIndex>, mut prefixes: Pair<Cow<Prefixes>>) -> bool {
+    fn visit(&mut self, nodes: Pair<NodeIndex>) -> bool {
         let indexes = nodes.map(|node| node.index());
 
         let visits = self.visits.as_ref().zip(indexes);
@@ -499,12 +586,12 @@ impl SubtypeVisitor<'_> {
             return false;
         }
 
-        if !reduce(&mut prefixes) {
+        if !reduce(&mut self.prefixes) {
             return false;
         }
 
         let pairs = self.graphs.zip(nodes);
-        let empty_prefixes = prefixes.iter().all(|prefixes| prefixes.queue.is_empty());
+        let empty_prefixes = self.prefixes.iter().all(Prefixes::is_empty);
 
         match pairs.map(|(graph, node)| &graph[node]).into_tuple() {
             (Node::End, Node::End) if empty_prefixes => true,
@@ -549,19 +636,19 @@ impl SubtypeVisitor<'_> {
                 let output = match directions.into_tuple() {
                     (Direction::Send, Direction::Send) => {
                         let quantifiers = Pair::new(Quantifier::All, Quantifier::Any);
-                        self.unroll::<_, false>(edges, prefixes, quantifiers)
+                        self.unroll::<_, false>(edges, quantifiers)
                     }
                     (Direction::Send, Direction::Receive) => {
                         let quantifiers = Pair::new(Quantifier::All, Quantifier::All);
-                        self.unroll::<_, false>(edges, prefixes, quantifiers)
+                        self.unroll::<_, false>(edges, quantifiers)
                     }
                     (Direction::Receive, Direction::Send) => {
                         let quantifiers = Pair::new(Quantifier::Any, Quantifier::Any);
-                        self.unroll::<_, false>(edges, prefixes, quantifiers)
+                        self.unroll::<_, false>(edges, quantifiers)
                     }
                     (Direction::Receive, Direction::Receive) => {
                         let quantifiers = Pair::new(Quantifier::Any, Quantifier::All);
-                        self.unroll::<_, true>(edges, prefixes, quantifiers)
+                        self.unroll::<_, true>(edges, quantifiers)
                     }
                 };
 
@@ -577,12 +664,12 @@ impl SubtypeVisitor<'_> {
     }
 }
 
-fn reduce(prefixes: &mut Pair<Cow<Prefixes>>) -> bool {
-    fn reorder<R>(left: &Prefix, rights: &Prefixes, reject: R) -> Option<Option<usize>>
+fn reduce(prefixes: &mut Pair<Prefixes>) -> bool {
+    fn reorder<R>(left: &Prefix, rights: &Prefixes, reject: R) -> Option<Option<PrefixIndex>>
     where
         R: Fn(&Prefix, &Prefix) -> bool,
     {
-        let mut rights = rights.queue.iter().enumerate();
+        let mut rights = rights.iter();
 
         let (_, right) = rights.next().unwrap();
         if reject(left, right) {
@@ -602,11 +689,11 @@ fn reduce(prefixes: &mut Pair<Cow<Prefixes>>) -> bool {
         Some(None)
     }
 
-    while let (Some(left), Some(right)) = prefixes.as_ref().map(|p| p.queue.front()).into_tuple() {
+    while let (Some(left), Some(right)) = prefixes.as_ref().map(Prefixes::first).into_tuple() {
         // Fast path to avoid added control flow.
         if left == right {
-            for prefix in prefixes.iter_mut() {
-                prefix.to_mut().queue.pop_front().unwrap();
+            for prefixes in prefixes.iter_mut() {
+                prefixes.remove_first();
             }
 
             continue;
@@ -624,8 +711,8 @@ fn reduce(prefixes: &mut Pair<Cow<Prefixes>>) -> bool {
 
         match i {
             Some(Some(i)) => {
-                prefixes.left.to_mut().queue.pop_front().unwrap();
-                prefixes.right.to_mut().queue.remove(i).unwrap();
+                prefixes.left.remove_first();
+                prefixes.right.remove(i);
                 continue;
             }
             Some(None) => break,
@@ -644,7 +731,8 @@ pub fn is_subtype(left: &Serialized, right: &Serialized, visits: usize) -> bool 
         graphs: Pair::new(&left.graph, &right.graph),
         history: BitMatrix::new(sizes),
         visits: sizes.map(|size| vec![visits; size].into_boxed_slice()),
+        prefixes: Default::default(),
     };
 
-    visitor.visit(Default::default(), Default::default())
+    visitor.visit(Default::default())
 }
