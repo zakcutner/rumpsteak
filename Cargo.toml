@@ -31,7 +31,7 @@ name = "three_adder"
 harness = false
 
 [dependencies]
-bitvec = { version = "0.22", optional = true }
+bitvec = { version = "0.20", optional = true }
 futures = "0.3"
 petgraph = { version = "0.5", optional = true }
 rumpsteak-macros = { path = "macros", version = "0.1" }
