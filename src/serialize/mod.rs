@@ -281,13 +281,13 @@ impl Display for PetrifyFormatter<'_> {
     }
 }
 
-pub struct Petrify<'a> {
-    serialized: &'a [Serialized],
+pub struct Petrify<'a, 'b> {
+    serialized: &'a [&'b Serialized],
     roles: HashMap<TypeId, usize>,
 }
 
-impl<'a> Petrify<'a> {
-    pub fn new(serialized: &'a [Serialized]) -> Self {
+impl<'a, 'b> Petrify<'a, 'b> {
+    pub fn new(serialized: &'a [&'b Serialized]) -> Self {
         let roles = serialized.iter().enumerate().map(|(i, s)| (s.role.id, i));
         Self {
             serialized,
@@ -296,7 +296,7 @@ impl<'a> Petrify<'a> {
     }
 }
 
-impl Display for Petrify<'_> {
+impl Display for Petrify<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let (mut serialized_iter, labels) = (self.serialized.iter(), RefCell::new(HashMap::new()));
         if let Some(serialized) = serialized_iter.next() {
