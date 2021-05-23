@@ -24,7 +24,7 @@ harness = false
 [[bench]]
 name = "subtyping"
 harness = false
-required-features = ["serialize"]
+required-features = ["serialize", "subtyping"]
 
 [[bench]]
 name = "three_adder"
@@ -46,7 +46,9 @@ rumpsteak-oneshot = { path = "oneshot" }
 tokio = { version = "1.0", features = ["macros", "rt", "time"] }
 
 [features]
-serialize = ["bitvec", "petgraph", "rumpsteak-macros/serialize"]
+fsm = ["petgraph"]
+serialize = ["fsm", "rumpsteak-macros/serialize"]
+subtyping = ["bitvec", "fsm"]
 
 [profile.release]
 debug = true

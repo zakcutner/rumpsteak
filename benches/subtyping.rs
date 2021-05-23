@@ -5,7 +5,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use rumpsteak::{
-    channel::Bidirectional, serialize, session, Branch, Message, Role, Roles, Select, Send,
+    channel::Bidirectional, serialize, session, subtyping, Branch, Message, Role, Roles, Select,
+    Send,
 };
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
@@ -64,7 +65,7 @@ pub fn criterion_benchmark(criterion: &mut Criterion) {
         let client_optimized = serialize::serialize::<ClientOptimized<'_, C>>();
 
         bencher.iter(|| {
-            assert!(!serialize::is_subtype(&client_optimized, &client, 10));
+            assert!(!subtyping::is_subtype(&client_optimized, &client, 10));
         })
     });
 }
