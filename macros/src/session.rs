@@ -1,10 +1,18 @@
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use std::mem;
+use std::{collections::HashSet, mem};
 use syn::{
     parse::Nothing, parse2, parse_quote, punctuated::Punctuated, Error, Fields, GenericArgument,
-    Index, Item, ItemEnum, ItemStruct, ItemType, PathArguments, Result, Type,
+    GenericParam, Ident, Index, Item, ItemEnum, ItemStruct, ItemType, PathArguments, Result, Type,
 };
+
+fn idents_set<P>(params: &Punctuated<GenericParam, P>) -> HashSet<Ident> {
+    let idents = params.iter().filter_map(|param| match param {
+        GenericParam::Type(ty) => Some(ty.ident.clone()),
+        _ => None,
+    });
+    idents.collect::<HashSet<_>>()
+}
 
 fn punctuated_prepend<T, P: Default>(left: &mut Punctuated<T, P>, mut right: Punctuated<T, P>) {
     right.extend(mem::take(left));
@@ -23,18 +31,26 @@ fn unroll_type(mut ty: &mut Type) -> &mut Type {
     ty
 }
 
-fn augment_type(mut ty: &mut Type) {
+fn augment_type(mut ty: &mut Type, exclude: &HashSet<Ident>) {
     while let Type::Path(path) = unroll_type(ty) {
-        let args = match path.path.segments.last_mut() {
-            Some(segment) => &mut segment.arguments,
+        if *path == parse_quote!(Self) {
+            break;
+        }
+
+        let segment = match path.path.segments.last_mut() {
+            Some(segment) => segment,
             _ => break,
         };
 
-        if let PathArguments::None = args {
-            *args = PathArguments::AngleBracketed(parse_quote!(<>));
+        if let PathArguments::None = segment.arguments {
+            if exclude.contains(&segment.ident) {
+                break;
+            }
+
+            segment.arguments = PathArguments::AngleBracketed(parse_quote!(<>));
         }
 
-        let args = match args {
+        let args = match &mut segment.arguments {
             PathArguments::AngleBracketed(args) => &mut args.args,
             _ => break,
         };
@@ -54,16 +70,18 @@ fn augment_type(mut ty: &mut Type) {
 }
 
 fn session_type(mut input: ItemType) -> TokenStream {
+    let exclude = idents_set(&input.generics.params);
     punctuated_prepend(
         &mut input.generics.params,
         parse_quote!('__r, __R: ::rumpsteak::Role),
     );
-    augment_type(&mut input.ty);
+    augment_type(&mut input.ty, &exclude);
     input.into_token_stream()
 }
 
 fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
     let ident = &input.ident;
+    let exclude = idents_set(&input.generics.params);
 
     punctuated_prepend(
         &mut input.generics.params,
@@ -77,7 +95,7 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
     }
 
     let field = input.fields.iter_mut().next().unwrap();
-    augment_type(&mut field.ty);
+    augment_type(&mut field.ty, &exclude);
 
     let field_ty = &field.ty;
     let field_ident = match &field.ident {
@@ -106,12 +124,9 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
 
     #[cfg(feature = "serialize")]
     {
-        let mut generics = input.generics.clone();
-        let where_clause = generics.make_where_clause();
-        where_clause.predicates.push(parse_quote!('__r: 'static));
-        where_clause.predicates.push(parse_quote!(__R: 'static));
+        let mut where_clause = where_clause.cloned().unwrap_or_else(|| parse_quote!(where));
+        where_clause.predicates.push(parse_quote!(Self: 'static));
 
-        let (_, _, where_clause) = generics.split_for_impl();
         output.extend(quote! {
             impl #impl_generics ::rumpsteak::serialize::Serialize for #ident #ty_generics #where_clause {
                 fn serialize(s: &mut ::rumpsteak::serialize::Serializer) {
@@ -125,11 +140,13 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
 }
 
 fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
-    let ident = &input.ident;
     if input.variants.is_empty() {
         let message = "expected at least one variant";
         return Err(Error::new_spanned(&input.variants, message));
     }
+
+    let ident = &input.ident;
+    let exclude = idents_set(&input.generics.params);
 
     punctuated_prepend(
         &mut input.generics.params,
@@ -159,7 +176,7 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
         labels.push(label);
 
         let ty = &mut fields.next().unwrap().ty;
-        augment_type(ty);
+        augment_type(ty, &exclude);
         tys.push(&*ty);
     }
 
@@ -174,12 +191,9 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
 
     #[cfg(feature = "serialize")]
     {
-        let mut generics = input.generics.clone();
-        let where_clause = generics.make_where_clause();
-        where_clause.predicates.push(parse_quote!('__r: 'static));
-        where_clause.predicates.push(parse_quote!(__R: 'static));
+        let mut where_clause = where_clause.cloned().unwrap_or_else(|| parse_quote!(where));
+        where_clause.predicates.push(parse_quote!(Self: 'static));
 
-        let (_, _, where_clause) = generics.split_for_impl();
         output.extend(quote! {
             impl #impl_generics ::rumpsteak::serialize::SerializeChoices for #ident #ty_generics #where_clause {
                 fn serialize_choices(mut s: ::rumpsteak::serialize::ChoicesSerializer<'_>) {
