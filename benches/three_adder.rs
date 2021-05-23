@@ -109,7 +109,6 @@ pub fn criterion_benchmark(criterion: &mut Criterion) {
 
     oneshot::criterion_benchmark(criterion);
     blocking::criterion_benchmark(criterion);
-    blocking_oneshot::criterion_benchmark(criterion);
 }
 
 mod oneshot {
@@ -280,88 +279,6 @@ mod blocking {
                 let c = c.join().unwrap().unwrap();
 
                 roles = Some(Roles(a, b, c));
-            });
-        });
-    }
-}
-
-mod blocking_oneshot {
-    use criterion::Criterion;
-    use mpstthree::{
-        binary::{End, Recv, Send},
-        fork_mpst,
-        functionmpst::{
-            close::close_mpst,
-            recv::{
-                recv_mpst_a_to_b, recv_mpst_a_to_c, recv_mpst_b_to_a, recv_mpst_b_to_c,
-                recv_mpst_c_to_a, recv_mpst_c_to_b,
-            },
-            send::{
-                send_mpst_a_to_b, send_mpst_a_to_c, send_mpst_b_to_a, send_mpst_b_to_c,
-                send_mpst_c_to_a, send_mpst_c_to_b,
-            },
-        },
-        role::{a::RoleA, b::RoleB, c::RoleC, end::RoleEnd},
-        sessionmpst::SessionMpst,
-    };
-    use std::{error::Error, result};
-
-    type Result<T> = result::Result<T, Box<dyn Error>>;
-
-    type AtoB = Send<i32, Recv<i32, End>>;
-    type AtoC = Send<i32, Recv<i32, End>>;
-    type QueueA = RoleB<RoleB<RoleC<RoleC<RoleEnd>>>>;
-    type EndpointA = SessionMpst<AtoB, AtoC, QueueA, RoleA<RoleEnd>>;
-
-    type BtoA = Recv<i32, Send<i32, End>>;
-    type BtoC = Send<i32, Recv<i32, End>>;
-    type QueueB = RoleA<RoleA<RoleC<RoleC<RoleEnd>>>>;
-    type EndpointB = SessionMpst<BtoA, BtoC, QueueB, RoleB<RoleEnd>>;
-
-    type CtoA = Recv<i32, Send<i32, End>>;
-    type CtoB = Recv<i32, Send<i32, End>>;
-    type QueueC = RoleA<RoleB<RoleA<RoleB<RoleEnd>>>>;
-    type EndpointC = SessionMpst<CtoA, CtoB, QueueC, RoleC<RoleEnd>>;
-
-    fn adder_a(s: EndpointA) -> Result<()> {
-        let x = 2;
-        let s = send_mpst_a_to_b(x, s);
-        let (y, s) = recv_mpst_a_to_b(s)?;
-        let s = send_mpst_a_to_c(y, s);
-        let (z, s) = recv_mpst_a_to_c(s)?;
-        assert_eq!(z, 5);
-        close_mpst(s)?;
-        Ok(())
-    }
-
-    fn adder_b(s: EndpointB) -> Result<()> {
-        let (y, s) = recv_mpst_b_to_a(s)?;
-        let x = 3;
-        let s = send_mpst_b_to_a(x, s);
-        let s = send_mpst_b_to_c(y, s);
-        let (z, s) = recv_mpst_b_to_c(s)?;
-        assert_eq!(z, 5);
-        close_mpst(s)?;
-        Ok(())
-    }
-
-    fn adder_c(s: EndpointC) -> Result<()> {
-        let (x, s) = recv_mpst_c_to_a(s)?;
-        let (y, s) = recv_mpst_c_to_b(s)?;
-        let z = x + y;
-        let s = send_mpst_c_to_a(z, s);
-        let s = send_mpst_c_to_b(z, s);
-        close_mpst(s)?;
-        Ok(())
-    }
-
-    pub fn criterion_benchmark(criterion: &mut Criterion) {
-        criterion.bench_function("blocking_oneshot_three_adder", |bencher| {
-            bencher.iter(|| {
-                let (thread_a, thread_b, thread_c) = fork_mpst(adder_a, adder_b, adder_c);
-                assert!(thread_a.is_ok());
-                assert!(thread_b.is_ok());
-                assert!(thread_c.is_ok());
             });
         });
     }
