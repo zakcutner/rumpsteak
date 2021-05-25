@@ -16,9 +16,12 @@ use termcolor::{Color, ColorSpec, StandardStream, WriteColor};
 
 struct ColorChoice(termcolor::ColorChoice);
 
-impl Default for ColorChoice {
-    fn default() -> Self {
-        Self(termcolor::ColorChoice::Auto)
+impl ColorChoice {
+    fn auto() -> Self {
+        match atty::is(atty::Stream::Stdout) {
+            true => Self(termcolor::ColorChoice::Auto),
+            false => Self(termcolor::ColorChoice::Never),
+        }
     }
 }
 
@@ -27,7 +30,7 @@ impl FromStr for ColorChoice {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "auto" => Ok(Self(termcolor::ColorChoice::Auto)),
+            "auto" => Ok(Self::auto()),
             "always" => Ok(Self(termcolor::ColorChoice::Always)),
             "never" => Ok(Self(termcolor::ColorChoice::Never)),
             _ => Err("invalid color choice, possible values are 'auto', 'always' or 'never'"),
@@ -46,7 +49,7 @@ impl From<ColorChoice> for termcolor::ColorChoice {
 #[derive(FromArgs)]
 struct Options {
     /// whether to use colored output, defaults to 'auto'
-    #[argh(option, default = "Default::default()")]
+    #[argh(option, default = "ColorChoice::auto()")]
     color: ColorChoice,
 
     /// how many visits to allow to each state
