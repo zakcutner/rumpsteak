@@ -3,8 +3,8 @@
 pub mod dot;
 pub mod petrify;
 
-pub use dot::Dot;
-pub use petrify::Petrify;
+pub use self::dot::Dot;
+pub use self::petrify::Petrify;
 
 use petgraph::{graph::NodeIndex, visit::EdgeRef, Graph};
 use std::{
