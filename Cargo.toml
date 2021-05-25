@@ -13,6 +13,11 @@ categories = ["asynchronous", "concurrency"]
 [lib]
 bench = false
 
+[[bin]]
+name = "subtyping"
+path = "src/subtyping/main.rs"
+required-features = ["argh", "atty", "parsing", "subtyping", "termcolor"]
+
 [[bench]]
 name = "double_buffering"
 harness = false
@@ -31,10 +36,16 @@ name = "three_adder"
 harness = false
 
 [dependencies]
+argh = { version = "0.1", optional = true }
+atty = { version = "0.2", optional = true }
 bitvec = { version = "0.20", optional = true }
+enum-kinds = { version = "0.5", optional = true }
 futures = "0.3"
+logos = { version = "0.12", optional = true }
+memchr = { version = "2.4", optional = true }
 petgraph = { version = "0.5", optional = true }
 rumpsteak-macros = { path = "macros", version = "0.1" }
+termcolor = { version = "1.1", optional = true }
 thiserror = "1.0"
 
 [dev-dependencies]
@@ -43,10 +54,12 @@ futures = { version = "0.3", features = ["thread-pool"] }
 num-complex = "0.4"
 rand = { version = "0.8", features = ["small_rng"] }
 rumpsteak-oneshot = { path = "oneshot" }
+tempfile = "3.2"
 tokio = { version = "1.0", features = ["macros", "rt", "time"] }
 
 [features]
 fsm = ["petgraph"]
+parsing = ["enum-kinds", "fsm", "logos", "memchr"]
 serialize = ["fsm", "rumpsteak-macros/serialize"]
 subtyping = ["bitvec", "fsm"]
 

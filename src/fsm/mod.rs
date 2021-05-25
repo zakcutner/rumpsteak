@@ -1,13 +1,20 @@
 #![cfg(feature = "fsm")]
 
+pub mod dot;
+pub mod petrify;
+
+pub use dot::Dot;
+pub use petrify::Petrify;
+
 use petgraph::{graph::NodeIndex, visit::EdgeRef, Graph};
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
     hash::Hash,
 };
+use thiserror::Error;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Action {
     Input,
     Output,
@@ -22,11 +29,13 @@ impl Display for Action {
     }
 }
 
+#[derive(Clone, Debug)]
 struct Choices<R> {
     role: R,
     action: Action,
 }
 
+#[derive(Clone, Debug)]
 enum State<R> {
     Choices(Choices<R>),
     End,
@@ -41,7 +50,7 @@ impl StateIndex {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Transition<R, L> {
     pub role: R,
     pub action: Action,
@@ -64,6 +73,17 @@ impl<R: Display, L: Display> Display for Transition<R, L> {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum TransitionError {
+    #[error("cannot perform self-communication")]
+    SelfCommunication,
+    #[error("cannot communicate with different roles from the same state")]
+    MultipleRoles,
+    #[error("cannot both send and receive from the same state")]
+    MultipleActions,
+}
+
+#[derive(Clone, Debug)]
 pub struct Fsm<R, L> {
     role: R,
     graph: Graph<State<R>, L>,
@@ -89,14 +109,14 @@ impl<R, L> Fsm<R, L> {
 
     pub fn transitions(
         &self,
-    ) -> impl Iterator<Item = (StateIndex, Transition<&R, &L>, StateIndex)> {
+    ) -> impl Iterator<Item = (StateIndex, StateIndex, Transition<&R, &L>)> {
         self.graph
             .edge_references()
             .map(move |edge| match &self.graph[edge.source()] {
                 State::Choices(choices) => (
                     StateIndex(edge.source()),
-                    Transition::new(&choices.role, choices.action, edge.weight()),
                     StateIndex(edge.target()),
+                    Transition::new(&choices.role, choices.action, edge.weight()),
                 ),
                 _ => unreachable!(),
             })
@@ -105,13 +125,13 @@ impl<R, L> Fsm<R, L> {
     pub fn transitions_from(
         &self,
         StateIndex(index): StateIndex,
-    ) -> impl Iterator<Item = (Transition<&R, &L>, StateIndex)> {
+    ) -> impl Iterator<Item = (StateIndex, Transition<&R, &L>)> {
         self.graph
             .edges(index)
             .map(move |edge| match &self.graph[index] {
                 State::Choices(choices) => (
-                    Transition::new(&choices.role, choices.action, edge.weight()),
                     StateIndex(edge.target()),
+                    Transition::new(&choices.role, choices.action, edge.weight()),
                 ),
                 _ => unreachable!(),
             })
@@ -126,12 +146,12 @@ impl<R, L> Fsm<R, L> {
         from: StateIndex,
         to: StateIndex,
         transition: Transition<R, L>,
-    ) -> Result<(), &str>
+    ) -> Result<(), TransitionError>
     where
         R: Eq,
     {
         if transition.role == self.role {
-            return Err("roles cannot communicate with themselves");
+            return Err(TransitionError::SelfCommunication);
         }
 
         let choices = Choices {
@@ -144,76 +164,17 @@ impl<R, L> Fsm<R, L> {
             State::End => *state = State::Choices(choices),
             State::Choices(expected) => {
                 if choices.role != expected.role {
-                    return Err("states cannot communicate with multiple roles");
+                    return Err(TransitionError::MultipleRoles);
                 }
 
                 if choices.action != expected.action {
-                    return Err("states cannot both send and receive");
+                    return Err(TransitionError::MultipleActions);
                 }
             }
         }
 
         self.graph.add_edge(from.0, to.0, transition.label);
         Ok(())
-    }
-}
-
-pub struct Dot<'a, R, L>(&'a Fsm<R, L>);
-
-impl<'a, R: Display, L: Display> Dot<'a, R, L> {
-    pub fn new(fsm: &'a Fsm<R, L>) -> Self {
-        Self(fsm)
-    }
-}
-
-impl<'a, R: Display, L: Display> Display for Dot<'a, R, L> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "digraph {} {{", self.0.role())?;
-        let (states, transitions) = self.0.size();
-
-        if states > 0 {
-            writeln!(f)?;
-        }
-
-        for i in self.0.states() {
-            writeln!(f, "    {};", i.index())?;
-        }
-
-        if transitions > 0 {
-            writeln!(f)?;
-        }
-
-        for (from, transition, to) in self.0.transitions() {
-            let (from, to) = (from.index(), to.index());
-            writeln!(f, "    {} -> {} [label=\"{}\"];", from, to, transition)?;
-        }
-
-        write!(f, "}}")
-    }
-}
-
-pub struct Petrify<'a, R, L>(&'a Fsm<R, L>);
-
-impl<'a, R: Display, L: Display> Petrify<'a, R, L> {
-    pub fn new(fsm: &'a Fsm<R, L>) -> Self {
-        assert!(fsm.size().0 > 0);
-        Self(fsm)
-    }
-}
-
-impl<'a, R: Display, L: Display> Display for Petrify<'a, R, L> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        writeln!(f, ".outputs")?;
-        writeln!(f, ".state graph")?;
-
-        for (from, transition, to) in self.0.transitions() {
-            let (from, to) = (from.index(), to.index());
-            let (role, action, label) = (transition.role, transition.action, transition.label);
-            writeln!(f, "s{} {} {} {} s{}", from, role, action, label, to)?;
-        }
-
-        writeln!(f, ".marking s0")?;
-        write!(f, ".end")
     }
 }
 

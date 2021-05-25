@@ -139,7 +139,7 @@ struct SubtypeVisitor<'a, R, L> {
 
 impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
     #[inline]
-    fn unroll<I: Iterator<Item = (Transition<&'a R, &'a L>, StateIndex)>, const SWAP: bool>(
+    fn unroll<I: Iterator<Item = (StateIndex, Transition<&'a R, &'a L>)>, const SWAP: bool>(
         &mut self,
         mut transitions: Pair<I>,
         mut quantifiers: Pair<Quantifier>,
@@ -154,7 +154,7 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
         let right_transitions = transitions.right.collect::<Vec<_>>();
         let snapshots = prefixes.map(Prefix::snapshot);
 
-        for (left_transition, left_state) in transitions.left {
+        for (left_state, left_transition) in transitions.left {
             let mut prefixes = self.prefixes.as_mut();
             if SWAP {
                 prefixes.swap();
@@ -164,7 +164,7 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
             prefixes.left.push(left_transition);
 
             let mut output = quantifiers.right == Quantifier::All;
-            for (right_transition, right_state) in &right_transitions {
+            for (right_state, right_transition) in &right_transitions {
                 let mut prefixes = self.prefixes.as_mut();
                 if SWAP {
                     prefixes.swap();
@@ -213,7 +213,7 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
 
         match transitions.as_mut().map(Peekable::peek).into() {
             (None, None) if empty_prefixes => true,
-            (Some((left, _)), Some((right, _))) => {
+            (Some((_, left)), Some((_, right))) => {
                 let in_history = self.history.get(indexes);
                 if in_history && empty_prefixes {
                     return true;
