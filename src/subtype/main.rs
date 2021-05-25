@@ -1,7 +1,7 @@
 use argh::FromArgs;
 use rumpsteak::{
     fsm::{dot, Fsm},
-    subtyping,
+    subtype,
 };
 use std::{
     borrow::Cow,
@@ -98,7 +98,7 @@ fn main() {
     let right = read_file(&options.right);
     let right = parse_fsm(&right, &options.right);
 
-    let is_subtype = subtyping::is_subtype(&left, &right, options.visits);
+    let is_subtype = subtype::is_subtype(&left, &right, options.visits);
 
     let mut stdout = StandardStream::stdout(options.color.into());
     write!(&mut stdout, "left ").unwrap();

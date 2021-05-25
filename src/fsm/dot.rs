@@ -2,7 +2,7 @@ use super::Fsm;
 use std::fmt::{self, Display, Formatter};
 
 #[cfg(feature = "parsing")]
-pub use self::parsing::{parse, ParseError};
+pub use self::parse::{parse, ParseError};
 
 pub struct Dot<'a, R, L>(&'a Fsm<R, L>);
 
@@ -39,7 +39,7 @@ impl<'a, R: Display, L: Display> Display for Dot<'a, R, L> {
 }
 
 #[cfg(feature = "parsing")]
-mod parsing {
+mod parse {
     use crate::fsm::{Action, Fsm, Transition, TransitionError};
     use enum_kinds::EnumKind;
     use logos::{Lexer, Logos};

@@ -14,8 +14,8 @@ categories = ["asynchronous", "concurrency"]
 bench = false
 
 [[bin]]
-name = "subtyping"
-path = "src/subtyping/main.rs"
+name = "subtype"
+path = "src/subtype/main.rs"
 required-features = ["argh", "atty", "parsing", "subtyping", "termcolor"]
 
 [[bench]]
@@ -27,7 +27,7 @@ name = "ring"
 harness = false
 
 [[bench]]
-name = "subtyping"
+name = "subtype"
 harness = false
 required-features = ["serialize", "subtyping"]
 

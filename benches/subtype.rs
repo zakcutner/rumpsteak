@@ -5,8 +5,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use rumpsteak::{
-    channel::Bidirectional, serialize, session, subtyping, Branch, Message, Role, Roles, Select,
-    Send,
+    channel::Bidirectional, serialize, session, subtype, Branch, Message, Role, Roles, Select, Send,
 };
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
@@ -60,12 +59,12 @@ enum ClientOptimizedChoice {
 }
 
 pub fn criterion_benchmark(criterion: &mut Criterion) {
-    criterion.bench_function("subtyping", |bencher| {
+    criterion.bench_function("subtype", |bencher| {
         let client = serialize::serialize::<Client<'_, C>>();
         let client_optimized = serialize::serialize::<ClientOptimized<'_, C>>();
 
         bencher.iter(|| {
-            assert!(!subtyping::is_subtype(&client_optimized, &client, 10));
+            assert!(!subtype::is_subtype(&client_optimized, &client, 10));
         })
     });
 }

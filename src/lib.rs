@@ -1,5 +1,5 @@
 pub mod fsm;
-pub mod subtyping;
+pub mod subtype;
 
 mod session;
 
