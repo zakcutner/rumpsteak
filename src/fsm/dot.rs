@@ -2,7 +2,7 @@ use super::Fsm;
 use std::fmt::{self, Display, Formatter};
 
 #[cfg(feature = "parsing")]
-pub use self::parse::{parse, ParseError};
+pub use self::parse::{parse, ParseError, ParseIter};
 
 pub struct Dot<'a, R, L>(&'a Fsm<R, L>);
 
@@ -299,31 +299,30 @@ mod parse {
         Some(Transition::new(role, action, label))
     }
 
-    pub fn parse(input: &str) -> Result<Fsm<Cow<str>, Cow<str>>, ParseError> {
-        let mut tokens = PeekableLexer::new(Token::lexer(input));
-        expect(&mut tokens, &[TokenKind::Digraph])?;
+    fn parse_one<'a>(
+        tokens: &mut PeekableLexer<'a>,
+    ) -> Result<Fsm<Cow<'a, str>, Cow<'a, str>>, ParseError> {
+        expect(tokens, &[TokenKind::Digraph])?;
 
-        let mut fsm = match expect(&mut tokens, &[TokenKind::Identifier])? {
+        let mut fsm = match expect(tokens, &[TokenKind::Identifier])? {
             Token::Identifier(role) => Fsm::new(role),
             _ => unreachable!(),
         };
 
-        expect(&mut tokens, &[TokenKind::LeftBrace])?;
+        expect(tokens, &[TokenKind::LeftBrace])?;
 
         let mut states = HashMap::new();
         let mut transitions = HashSet::new();
 
         loop {
             let expected = &[TokenKind::RightBrace, TokenKind::Identifier];
-            let left = match expect(&mut tokens, expected)? {
+            let left = match expect(tokens, expected)? {
                 Token::RightBrace => break,
                 Token::Identifier(left) => left,
                 _ => unreachable!(),
             };
 
-            if expect(&mut tokens, &[TokenKind::Semicolon, TokenKind::Arrow])?
-                == TokenKind::Semicolon
-            {
+            if expect(tokens, &[TokenKind::Semicolon, TokenKind::Arrow])? == TokenKind::Semicolon {
                 match states.entry(left) {
                     Entry::Occupied(entry) => {
                         return Err(ParseError::DuplicateState(entry.key().as_ref().to_owned()));
@@ -335,16 +334,16 @@ mod parse {
                 }
             }
 
-            let right = match expect(&mut tokens, &[TokenKind::Identifier])? {
+            let right = match expect(tokens, &[TokenKind::Identifier])? {
                 Token::Identifier(right) => right,
                 _ => unreachable!(),
             };
 
-            expect(&mut tokens, &[TokenKind::LeftSquare])?;
-            expect(&mut tokens, &[TokenKind::Label])?;
-            expect(&mut tokens, &[TokenKind::Equals])?;
+            expect(tokens, &[TokenKind::LeftSquare])?;
+            expect(tokens, &[TokenKind::Label])?;
+            expect(tokens, &[TokenKind::Equals])?;
 
-            let transition = match expect(&mut tokens, &[TokenKind::Identifier])? {
+            let transition = match expect(tokens, &[TokenKind::Identifier])? {
                 Token::Identifier(transition) => transition,
                 _ => unreachable!(),
             };
@@ -361,14 +360,9 @@ mod parse {
                 return Err(ParseError::DuplicateTransition);
             }
 
-            optional(&mut tokens, &[TokenKind::Comma]);
-            expect(&mut tokens, &[TokenKind::RightSquare])?;
-            expect(&mut tokens, &[TokenKind::Semicolon])?;
-        }
-
-        if tokens.next().is_some() {
-            let actual = Some(tokens.slice().to_owned());
-            return Err(UnexpectedTokenError::new(&[TokenKind::EndOfInput], actual).into());
+            optional(tokens, &[TokenKind::Comma]);
+            expect(tokens, &[TokenKind::RightSquare])?;
+            expect(tokens, &[TokenKind::Semicolon])?;
         }
 
         for (from, to, transition) in transitions {
@@ -382,5 +376,23 @@ mod parse {
         }
 
         Ok(fsm)
+    }
+
+    pub struct ParseIter<'a>(PeekableLexer<'a>);
+
+    impl<'a> Iterator for ParseIter<'a> {
+        type Item = Result<Fsm<Cow<'a, str>, Cow<'a, str>>, ParseError>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.0.peek().is_some() {
+                return Some(parse_one(&mut self.0));
+            }
+
+            None
+        }
+    }
+
+    pub fn parse(input: &str) -> ParseIter {
+        ParseIter(PeekableLexer::new(Token::lexer(input)))
     }
 }

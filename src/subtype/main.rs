@@ -1,6 +1,9 @@
 use argh::FromArgs;
 use rumpsteak::{
-    fsm::{dot, Fsm},
+    fsm::{
+        dot::{self, ParseError},
+        Fsm,
+    },
     subtype,
 };
 use std::{
@@ -78,8 +81,11 @@ fn read_file(path: &str) -> String {
     }
 }
 
-fn parse_fsm<'a>(input: &'a str, path: &str) -> Fsm<Cow<'a, str>, Cow<'a, str>> {
-    match dot::parse(input) {
+fn unwrap_fsm<'a>(
+    fsm: Result<Fsm<Cow<'a, str>, Cow<'a, str>>, ParseError>,
+    path: &str,
+) -> Fsm<Cow<'a, str>, Cow<'a, str>> {
+    match fsm {
         Ok(fsm) => fsm,
         Err(err) => error(format_args!("Error parsing '{}'", path), err),
     }
@@ -93,27 +99,33 @@ fn main() {
     let options = argh::from_env::<Options>();
 
     let left = read_file(&options.left);
-    let left = parse_fsm(&left, &options.left);
+    let left = dot::parse(&left);
 
     let right = read_file(&options.right);
-    let right = parse_fsm(&right, &options.right);
-
-    let is_subtype = subtype::is_subtype(&left, &right, options.visits);
+    let right = dot::parse(&right);
 
     let mut stdout = StandardStream::stdout(options.color.into());
-    write!(&mut stdout, "left ").unwrap();
+    for (i, (left, right)) in left.zip(right).enumerate() {
+        let left = unwrap_fsm(left, &options.left);
+        let right = unwrap_fsm(right, &options.right);
 
-    match is_subtype {
-        true => {
-            set_color(&mut stdout, Color::Green).unwrap();
-            write!(&mut stdout, "IS").unwrap();
+        let is_subtype = subtype::is_subtype(&left, &right, options.visits);
+        write!(&mut stdout, "{}. left ", i + 1).unwrap();
+
+        match is_subtype {
+            true => {
+                set_color(&mut stdout, Color::Green).unwrap();
+                write!(&mut stdout, "IS").unwrap();
+            }
+            false => {
+                set_color(&mut stdout, Color::Red).unwrap();
+                write!(&mut stdout, "IS NOT").unwrap();
+            }
         }
-        false => {
-            set_color(&mut stdout, Color::Red).unwrap();
-            write!(&mut stdout, "IS NOT").unwrap();
-        }
+
+        stdout.reset().unwrap();
+        writeln!(&mut stdout, " a subtype of right").unwrap();
     }
 
-    stdout.reset().unwrap();
-    writeln!(&mut stdout, " a subtype of right\n").unwrap();
+    writeln!(&mut stdout).unwrap();
 }
