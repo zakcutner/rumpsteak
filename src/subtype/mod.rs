@@ -1,9 +1,9 @@
 #![cfg(feature = "subtyping")]
 
-mod bit_matrix;
+mod matrix;
 mod pair;
 
-use self::{bit_matrix::BitMatrix, pair::Pair};
+use self::{matrix::Matrix, pair::Pair};
 use crate::fsm::{Action, Fsm, StateIndex, Transition};
 use std::{
     fmt::{self, Display, Formatter},
@@ -132,7 +132,7 @@ enum Quantifier {
 
 struct SubtypeVisitor<'a, R, L> {
     fsms: Pair<&'a Fsm<R, L>>,
-    history: BitMatrix,
+    history: Matrix<bool>,
     visits: Pair<Box<[usize]>>,
     prefixes: Pair<Prefix<'a, R, L>>,
 }
@@ -214,7 +214,7 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
         match transitions.as_mut().map(Peekable::peek).into() {
             (None, None) if empty_prefixes => true,
             (Some((_, left)), Some((_, right))) => {
-                let in_history = self.history.get(indexes);
+                let in_history = *self.history.get(indexes);
                 if in_history && empty_prefixes {
                     return true;
                 }
@@ -323,7 +323,7 @@ pub fn is_subtype<R: Eq, L: Eq>(left: &Fsm<R, L>, right: &Fsm<R, L>, visits: usi
     let sizes = Pair::new(left.size().0, right.size().0);
     let mut visitor = SubtypeVisitor {
         fsms: Pair::new(left, right),
-        history: BitMatrix::new(sizes),
+        history: Matrix::new(sizes),
         visits: sizes.map(|size| vec![visits; size].into_boxed_slice()),
         prefixes: Default::default(),
     };

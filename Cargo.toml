@@ -38,7 +38,6 @@ harness = false
 [dependencies]
 argh = { version = "0.1", optional = true }
 atty = { version = "0.2", optional = true }
-bitvec = { version = "0.20", optional = true }
 enum-kinds = { version = "0.5", optional = true }
 futures = { version = "0.3", optional = true }
 logos = { version = "0.12", optional = true }
@@ -55,7 +54,7 @@ num-complex = "0.4"
 rand = { version = "0.8", features = ["small_rng"] }
 rumpsteak-oneshot = { path = "oneshot" }
 tempfile = "3.2"
-tokio = { version = "1.0", features = ["macros", "rt", "time"] }
+tokio = { version = "1.6", features = ["macros", "rt", "time"] }
 
 [features]
 default = ["session"]
@@ -63,7 +62,7 @@ fsm = ["petgraph", "thiserror"]
 parsing = ["enum-kinds", "fsm", "logos", "memchr"]
 serialize = ["fsm", "rumpsteak-macros/serialize", "session"]
 session = ["futures", "rumpsteak-macros", "thiserror"]
-subtyping = ["bitvec", "fsm"]
+subtyping = ["fsm"]
 
 [profile.release]
 debug = true

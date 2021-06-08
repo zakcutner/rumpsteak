@@ -1,18 +1,22 @@
 use super::pair::Pair;
-use bitvec::{bitbox, boxed::BitBox};
-use std::fmt::{self, Debug, Formatter};
+use std::{
+    fmt::{self, Debug, Formatter},
+    iter,
+};
 
-pub struct BitMatrix {
+pub struct Matrix<T> {
     dimensions: Pair<usize>,
-    slice: BitBox,
+    slice: Box<[T]>,
 }
 
-impl BitMatrix {
-    pub fn new(dimensions: Pair<usize>) -> Self {
-        Self {
-            dimensions,
-            slice: bitbox![0; dimensions.left * dimensions.right],
-        }
+impl<T> Matrix<T> {
+    pub fn new(dimensions: Pair<usize>) -> Self
+    where
+        T: Default,
+    {
+        let slice = iter::repeat_with(Default::default);
+        let slice = slice.take(dimensions.left * dimensions.right).collect();
+        Self { dimensions, slice }
     }
 
     fn index(&self, indexes: Pair<usize>) -> usize {
@@ -20,17 +24,17 @@ impl BitMatrix {
         indexes.left * self.dimensions.right + indexes.right
     }
 
-    pub fn get(&self, indexes: Pair<usize>) -> bool {
-        self.slice[self.index(indexes)]
+    pub fn get(&self, indexes: Pair<usize>) -> &T {
+        &self.slice[self.index(indexes)]
     }
 
-    pub fn set(&mut self, indexes: Pair<usize>, value: bool) {
+    pub fn set(&mut self, indexes: Pair<usize>, value: T) {
         let index = self.index(indexes);
-        self.slice.set(index, value);
+        self.slice[index] = value;
     }
 }
 
-impl Debug for BitMatrix {
+impl<T: Debug> Debug for Matrix<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fn write<I: Iterator, N>(mut items: I, f: &mut Formatter<'_>, next: N) -> fmt::Result
         where
@@ -56,10 +60,7 @@ impl Debug for BitMatrix {
         });
 
         write(matrix, f, |vector, f| {
-            write(vector, f, |b, f| match b {
-                true => write!(f, "1"),
-                false => write!(f, "0"),
-            })
+            write(vector, f, |value, f| write!(f, "{:?}", value))
         })
     }
 }
