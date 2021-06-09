@@ -1,7 +1,6 @@
 use super::pair::Pair;
 use std::{
     fmt::{self, Debug, Formatter},
-    iter,
     ops::{Index, IndexMut},
 };
 
@@ -11,12 +10,11 @@ pub struct Matrix<T> {
 }
 
 impl<T> Matrix<T> {
-    pub fn new(dimensions: Pair<usize>) -> Self
+    pub fn new(dimensions: Pair<usize>, value: T) -> Self
     where
-        T: Default,
+        T: Clone,
     {
-        let slice = iter::repeat_with(Default::default);
-        let slice = slice.take(dimensions.left * dimensions.right).collect();
+        let slice = vec![value; dimensions.left * dimensions.right].into_boxed_slice();
         Self { dimensions, slice }
     }
 

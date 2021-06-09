@@ -2,125 +2,25 @@
 
 mod matrix;
 mod pair;
+mod prefix;
 
-use self::{matrix::Matrix, pair::Pair};
-use crate::fsm::{Action, Fsm, StateIndex, Transition};
-use std::{
-    fmt::{self, Display, Formatter},
-    iter::Peekable,
+use self::{
+    matrix::Matrix,
+    pair::Pair,
+    prefix::{Index, Prefix, Snapshot},
 };
+use crate::fsm::{Action, Fsm, StateIndex, Transition};
+use std::{iter::Peekable, mem};
 
-#[derive(Clone, Copy)]
-struct TransitionIndex(usize);
-
-#[derive(Debug, PartialEq, Eq)]
-struct PrefixSnapshot {
-    size: usize,
-    start: usize,
-    removed: usize,
+#[derive(Clone)]
+struct Previous {
+    visits: usize,
+    snapshots: Option<Pair<Snapshot>>,
 }
 
-#[derive(Debug)]
-struct Prefix<'a, R, L> {
-    transitions: Vec<(bool, Transition<&'a R, &'a L>)>,
-    start: usize,
-    removed: Vec<usize>,
-}
-
-impl<R, L> Default for Prefix<'_, R, L> {
-    fn default() -> Self {
-        Self {
-            transitions: Default::default(),
-            start: Default::default(),
-            removed: Default::default(),
-        }
-    }
-}
-
-impl<'a, R, L> Prefix<'a, R, L> {
-    fn is_empty(&self) -> bool {
-        self.start >= self.transitions.len()
-    }
-
-    fn first(&self) -> Option<&Transition<&'a R, &'a L>> {
-        if let Some((removed, transition)) = self.transitions.get(self.start) {
-            assert!(!removed);
-            return Some(transition);
-        }
-
-        None
-    }
-
-    fn push(&mut self, transition: Transition<&'a R, &'a L>) {
-        self.transitions.push((false, transition));
-    }
-
-    fn remove_first(&mut self) {
-        assert!(matches!(self.transitions.get(self.start), Some((false, _))));
-        self.start += 1;
-        while let Some((true, _)) = self.transitions.get(self.start) {
-            self.start += 1;
-        }
-    }
-
-    fn remove(&mut self, TransitionIndex(i): TransitionIndex) {
-        if i == self.start {
-            self.remove_first();
-            return;
-        }
-
-        let (removed, _) = &mut self.transitions[i];
-        assert!(!*removed);
-        *removed = true;
-        self.removed.push(i);
-    }
-
-    fn snapshot(&self) -> PrefixSnapshot {
-        PrefixSnapshot {
-            size: self.transitions.len(),
-            start: self.start,
-            removed: self.removed.len(),
-        }
-    }
-
-    fn restore(&mut self, snapshot: &PrefixSnapshot) {
-        for &i in self.removed.get(snapshot.removed..).unwrap_or_default() {
-            let (removed, _) = &mut self.transitions[i];
-            assert!(*removed);
-            *removed = false;
-        }
-
-        assert!(snapshot.removed <= self.removed.len());
-        self.removed.truncate(snapshot.removed);
-
-        assert!(snapshot.size <= self.transitions.len());
-        self.transitions.truncate(snapshot.size);
-
-        assert!(snapshot.start <= self.start);
-        self.start = snapshot.start;
-    }
-
-    fn iter(&self) -> impl Iterator<Item = (TransitionIndex, &Transition<&'a R, &'a L>)> {
-        let prefixes = self.transitions.iter().enumerate().skip(self.start);
-        prefixes.filter_map(|(i, (removed, transition))| {
-            (!removed).then(|| (TransitionIndex(i), transition))
-        })
-    }
-}
-
-impl<R: Display, L: Display> Display for Prefix<'_, R, L> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut transitions = self.iter().map(|(_, transition)| transition);
-        if let Some(transition) = transitions.next() {
-            write!(f, "{}", transition)?;
-            for transition in transitions {
-                write!(f, " . {}", transition)?;
-            }
-
-            return Ok(());
-        }
-
-        write!(f, "empty")
+impl Previous {
+    fn new(visits: usize, snapshots: Option<Pair<Snapshot>>) -> Self {
+        Self { visits, snapshots }
     }
 }
 
@@ -132,8 +32,7 @@ enum Quantifier {
 
 struct SubtypeVisitor<'a, R, L> {
     fsms: Pair<&'a Fsm<R, L>>,
-    history: Matrix<bool>,
-    visits: Pair<Box<[usize]>>,
+    history: Matrix<Previous>,
     prefixes: Pair<Prefix<'a, R, L>>,
 }
 
@@ -160,7 +59,7 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
                 prefixes.swap();
             }
 
-            prefixes.left.restore(&snapshots.left);
+            prefixes.left.revert(&snapshots.left);
             prefixes.left.push(left_transition);
 
             let mut output = quantifiers.right == Quantifier::All;
@@ -170,7 +69,7 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
                     prefixes.swap();
                 }
 
-                prefixes.right.restore(&snapshots.right);
+                prefixes.right.revert(&snapshots.right);
                 prefixes.right.push(right_transition.clone());
 
                 let mut states = Pair::new(left_state, *right_state);
@@ -194,10 +93,8 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
     }
 
     fn visit(&mut self, states: Pair<StateIndex>) -> bool {
-        let indexes = states.map(StateIndex::index);
-
-        let visits = self.visits.as_ref().zip(indexes);
-        if visits.into_iter().any(|(v, i)| v[i] == 0) {
+        let index = states.map(StateIndex::index);
+        if self.history[index].visits == 0 {
             return false;
         }
 
@@ -205,24 +102,25 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
             return false;
         }
 
-        let empty_prefixes = self.prefixes.iter().all(Prefix::is_empty);
+        if let Some(snapshots) = &self.history[index].snapshots {
+            let mut prefixes = self.prefixes.as_ref().zip(snapshots.as_ref()).into_iter();
+            if prefixes.all(|(prefix, snapshot)| !prefix.is_modified(snapshot)) {
+                return true;
+            }
+        }
+
         let mut transitions = self.fsms.zip(states).map(|(fsm, state)| {
             let transitions = fsm.transitions_from(state);
             transitions.peekable()
         });
 
+        let empty_prefixes = self.prefixes.iter().all(Prefix::is_empty);
         match transitions.as_mut().map(Peekable::peek).into() {
             (None, None) if empty_prefixes => true,
             (Some((_, left)), Some((_, right))) => {
-                let in_history = self.history[indexes];
-                if in_history && empty_prefixes {
-                    return true;
-                }
-
-                self.history[indexes] = true;
-                for (visits, i) in self.visits.as_mut().zip(indexes).into_iter() {
-                    visits[i] -= 1;
-                }
+                let snapshots = self.prefixes.as_ref().map(Prefix::snapshot);
+                let previous = Previous::new(self.history[index].visits - 1, Some(snapshots));
+                let previous = mem::replace(&mut self.history[index], previous);
 
                 let output = match (left.action, right.action) {
                     (Action::Output, Action::Output) => {
@@ -243,11 +141,7 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
                     }
                 };
 
-                self.history[indexes] = in_history;
-                for (visits, i) in self.visits.as_mut().zip(indexes).into_iter() {
-                    visits[i] += 1;
-                }
-
+                self.history[index] = previous;
                 output
             }
             _ => false,
@@ -260,8 +154,8 @@ fn reduce<R: Eq, L: Eq>(prefixes: &mut Pair<Prefix<R, L>>) -> bool {
         left: &Transition<&R, &L>,
         rights: &Prefix<R, L>,
         reject: impl Fn(&Transition<&R, &L>, &Transition<&R, &L>) -> bool,
-    ) -> Option<Option<TransitionIndex>> {
-        let mut rights = rights.iter();
+    ) -> Option<Option<Index>> {
+        let mut rights = rights.iter_full();
 
         let (_, right) = rights.next().unwrap();
         if reject(left, right) {
@@ -323,8 +217,7 @@ pub fn is_subtype<R: Eq, L: Eq>(left: &Fsm<R, L>, right: &Fsm<R, L>, visits: usi
     let sizes = Pair::new(left.size().0, right.size().0);
     let mut visitor = SubtypeVisitor {
         fsms: Pair::new(left, right),
-        history: Matrix::new(sizes),
-        visits: sizes.map(|size| vec![visits; size].into_boxed_slice()),
+        history: Matrix::new(sizes, Previous::new(visits, None)),
         prefixes: Default::default(),
     };
 
