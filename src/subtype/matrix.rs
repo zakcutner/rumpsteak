@@ -2,6 +2,7 @@ use super::pair::Pair;
 use std::{
     fmt::{self, Debug, Formatter},
     iter,
+    ops::{Index, IndexMut},
 };
 
 pub struct Matrix<T> {
@@ -19,18 +20,9 @@ impl<T> Matrix<T> {
         Self { dimensions, slice }
     }
 
-    fn index(&self, indexes: Pair<usize>) -> usize {
-        assert!(indexes.zip(self.dimensions).into_iter().all(|(i, d)| i < d));
-        indexes.left * self.dimensions.right + indexes.right
-    }
-
-    pub fn get(&self, indexes: Pair<usize>) -> &T {
-        &self.slice[self.index(indexes)]
-    }
-
-    pub fn set(&mut self, indexes: Pair<usize>, value: T) {
-        let index = self.index(indexes);
-        self.slice[index] = value;
+    fn offset(&self, index: Pair<usize>) -> usize {
+        assert!(index.zip(self.dimensions).into_iter().all(|(i, d)| i < d));
+        index.left * self.dimensions.right + index.right
     }
 }
 
@@ -52,15 +44,25 @@ impl<T: Debug> Debug for Matrix<T> {
             write!(f, "]")
         }
 
-        let matrix = (0..self.dimensions.left).map(|left| {
-            (0..self.dimensions.right).map(move |right| {
-                let indexes = Pair::new(left, right);
-                self.get(indexes)
-            })
-        });
+        let matrix = (0..self.dimensions.left)
+            .map(|left| (0..self.dimensions.right).map(move |right| &self[Pair::new(left, right)]));
 
         write(matrix, f, |vector, f| {
             write(vector, f, |value, f| write!(f, "{:?}", value))
         })
+    }
+}
+
+impl<T> Index<Pair<usize>> for Matrix<T> {
+    type Output = T;
+
+    fn index(&self, index: Pair<usize>) -> &Self::Output {
+        &self.slice[self.offset(index)]
+    }
+}
+
+impl<T> IndexMut<Pair<usize>> for Matrix<T> {
+    fn index_mut(&mut self, index: Pair<usize>) -> &mut Self::Output {
+        &mut self.slice[self.offset(index)]
     }
 }

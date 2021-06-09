@@ -214,12 +214,12 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
         match transitions.as_mut().map(Peekable::peek).into() {
             (None, None) if empty_prefixes => true,
             (Some((_, left)), Some((_, right))) => {
-                let in_history = *self.history.get(indexes);
+                let in_history = self.history[indexes];
                 if in_history && empty_prefixes {
                     return true;
                 }
 
-                self.history.set(indexes, true);
+                self.history[indexes] = true;
                 for (visits, i) in self.visits.as_mut().zip(indexes).into_iter() {
                     visits[i] -= 1;
                 }
@@ -243,7 +243,7 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
                     }
                 };
 
-                self.history.set(indexes, in_history);
+                self.history[indexes] = in_history;
                 for (visits, i) in self.visits.as_mut().zip(indexes).into_iter() {
                     visits[i] += 1;
                 }
