@@ -30,7 +30,8 @@ use futures::{
 };
 #[allow(unused_imports)]
 use rumpsteak::{
-    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send, try_session,
+    channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
+    Select, Send,
 };
 
 use std::error::Error;
@@ -142,42 +143,45 @@ enum ProtoA4 {
 async fn client(role: &mut C) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: ProtoC<'_, _>| async {
         match s.branch().await? {
-            ProtoC0::Cancel(Cancel(i), continuation)  => {
+            ProtoC0::Cancel(Cancel(i), continuation) => {
                 let s = continuation.send(Quit(i)).await?;
                 Ok(((), s))
-            },
+            }
             ProtoC0::Login(Login(i), continuation) => {
                 let s = continuation.send(Password(i)).await?;
                 match s.branch().await? {
                     ProtoC3::Auth(_i, end) => {
                         println!("Authenticated");
                         Ok(((), end))
-                    },
+                    }
                     ProtoC3::Again(_i, end) => {
                         println!("Authentication failed");
                         Ok(((), end))
-                    },
+                    }
                 }
-            },
+            }
         }
-    }).await
+    })
+    .await
 }
 
 async fn auth(role: &mut A) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: ProtoA<'_, _>| async {
         match s.branch().await? {
             ProtoA0::Password(Password(i), continuation) => {
-                if i == 10 { // Password is 10
+                if i == 10 {
+                    // Password is 10
                     let end = continuation.select(Auth(i)).await?;
                     Ok(((), end))
                 } else {
                     let end = continuation.select(Again(i)).await?;
                     Ok(((), end))
                 }
-            },
+            }
             ProtoA0::Quit(_i, end) => Ok(((), end)),
         }
-    }).await
+    })
+    .await
 }
 
 async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
@@ -189,21 +193,26 @@ async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
         let continuation = s.select(Login(i)).await?;
         match continuation.branch().await? {
             ProtoS2::Auth(Auth(i), cont) => {
-                let end = cont.send(Auth(i)).await?; 
+                let end = cont.send(Auth(i)).await?;
                 Ok(((), end))
-            },
+            }
             ProtoS2::Again(Again(i), cont) => {
-                let end = cont.send(Again(i)).await?; 
+                let end = cont.send(Again(i)).await?;
                 Ok(((), end))
             }
         }
-    }).await
+    })
+    .await
 }
-
 
 fn main() {
     let mut roles = Roles::default();
     executor::block_on(async {
-        try_join!(client(&mut roles.c), server(&mut roles.s), auth(&mut roles.a)).unwrap();
+        try_join!(
+            client(&mut roles.c),
+            server(&mut roles.s),
+            auth(&mut roles.a)
+        )
+        .unwrap();
     });
 }
