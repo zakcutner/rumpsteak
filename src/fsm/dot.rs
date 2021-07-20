@@ -6,7 +6,7 @@ pub use self::parse::{parse, ParseError, ParseIter};
 
 pub struct Dot<'a, R, L>(&'a Fsm<R, L>);
 
-impl<'a, R: Display, L: Display> Dot<'a, R, L> {
+impl<'a, R, L> Dot<'a, R, L> {
     pub fn new(fsm: &'a Fsm<R, L>) -> Self {
         Self(fsm)
     }

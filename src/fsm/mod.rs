@@ -1,6 +1,7 @@
 #![cfg(feature = "fsm")]
 
 pub mod dot;
+pub mod local;
 pub mod petrify;
 
 pub use self::dot::Dot;
@@ -41,7 +42,7 @@ enum State<R> {
     End,
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub struct StateIndex(NodeIndex);
 
 impl StateIndex {
@@ -64,6 +65,12 @@ impl<R, L> Transition<R, L> {
             action,
             label,
         }
+    }
+}
+
+impl<R: Clone, L: Clone> Transition<&R, &L> {
+    fn to_owned(&self) -> Transition<R, L> {
+        Transition::new(self.role.clone(), self.action, self.label.clone())
     }
 }
 

@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 
 pub struct Petrify<'a, R, L>(&'a Fsm<R, L>);
 
-impl<'a, R: Display, L: Display> Petrify<'a, R, L> {
+impl<'a, R, L> Petrify<'a, R, L> {
     pub fn new(fsm: &'a Fsm<R, L>) -> Self {
         assert!(fsm.size().0 > 0);
         Self(fsm)
