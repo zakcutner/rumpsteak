@@ -51,7 +51,8 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
         }
 
         let right_transitions = transitions.right.collect::<Vec<_>>();
-        let snapshots = prefixes.map(Prefix::snapshot);
+        let left_snapshot = prefixes.left.snapshot();
+        let right_snapshot = prefixes.right.snapshot();
 
         for (left_state, left_transition) in transitions.left {
             let mut prefixes = self.prefixes.as_mut();
@@ -59,8 +60,9 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
                 prefixes.swap();
             }
 
-            prefixes.left.revert(&snapshots.left);
+            prefixes.left.revert(&left_snapshot);
             prefixes.left.push(left_transition);
+            let left_snapshot = prefixes.left.snapshot();
 
             let mut output = quantifiers.right == Quantifier::All;
             for (right_state, right_transition) in &right_transitions {
@@ -69,7 +71,8 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
                     prefixes.swap();
                 }
 
-                prefixes.right.revert(&snapshots.right);
+                prefixes.left.revert(&left_snapshot);
+                prefixes.right.revert(&right_snapshot);
                 prefixes.right.push(right_transition.clone());
 
                 let mut states = Pair::new(left_state, *right_state);
