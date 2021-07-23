@@ -4,21 +4,38 @@ pub mod dot;
 pub mod local;
 pub mod petrify;
 
-pub use self::dot::Dot;
-pub use self::petrify::Petrify;
+pub use self::{dot::Dot, local::Local, petrify::Petrify};
 
 use petgraph::{graph::NodeIndex, visit::EdgeRef, Graph};
 use std::{
     collections::HashMap,
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     hash::Hash,
 };
 use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Nil;
+
+impl Display for Nil {
+    fn fmt(&self, _: &mut Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Action {
     Input,
     Output,
+}
+
+impl Action {
+    fn dual(&self) -> Self {
+        match self {
+            Self::Input => Self::Output,
+            Self::Output => Self::Input,
+        }
+    }
 }
 
 impl Display for Action {
@@ -182,6 +199,55 @@ impl<R, L> Fsm<R, L> {
 
         self.graph.add_edge(from.0, to.0, transition.label);
         Ok(())
+    }
+
+    pub fn to_binary(&self) -> Fsm<Nil, L>
+    where
+        R: Debug + Eq,
+        L: Clone,
+    {
+        let mut role = None;
+        let graph = self.graph.map(
+            |_, state| match state {
+                State::Choices(choice) => {
+                    match role {
+                        Some(role) => assert_eq!(role, &choice.role),
+                        None => role = Some(&choice.role),
+                    }
+
+                    State::Choices(Choices {
+                        role: Nil,
+                        action: choice.action,
+                    })
+                }
+                State::End => State::End,
+            },
+            |_, edge| edge.clone(),
+        );
+
+        Fsm { role: Nil, graph }
+    }
+
+    pub fn dual(&self, role: R) -> Self
+    where
+        R: Clone + Debug + Eq,
+        L: Clone,
+    {
+        let graph = self.graph.map(
+            |_, state| match state {
+                State::Choices(choice) => {
+                    assert_eq!(role, choice.role);
+                    State::Choices(Choices {
+                        role: self.role.clone(),
+                        action: choice.action.dual(),
+                    })
+                }
+                State::End => State::End,
+            },
+            |_, edge| edge.clone(),
+        );
+
+        Fsm { role, graph }
     }
 }
 

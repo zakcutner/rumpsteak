@@ -1,14 +1,14 @@
 use super::{Fsm, StateIndex, Transition};
 use std::fmt::{self, Display, Formatter};
 
-pub enum Type<R, L> {
+pub enum Local<R, L> {
     End,
     Recursion(usize),
     Variable(usize, Box<Self>),
     Transitions(Vec<(Transition<R, L>, Box<Self>)>),
 }
 
-impl<R: Clone, L: Clone> Type<R, L> {
+impl<R: Clone, L: Clone> Local<R, L> {
     pub fn new(fsm: &Fsm<R, L>) -> Self {
         let size = fsm.size().0;
         assert!(size > 0);
@@ -45,72 +45,52 @@ impl<'a, R: Clone, L: Clone> Builder<'a, R, L> {
         }
     }
 
-    fn build(&mut self, state: StateIndex) -> Type<R, L> {
+    fn build(&mut self, state: StateIndex) -> Local<R, L> {
         if self.seen[state.index()] {
-            return Type::Recursion(self.variable(state));
+            return Local::Recursion(self.variable(state));
         }
 
         let mut transitions = self.fsm.transitions_from(state).peekable();
         if transitions.peek().is_none() {
-            return Type::End;
+            return Local::End;
         }
 
         self.seen[state.index()] = true;
         let transitions = transitions
             .map(|(to, transition)| (Transition::to_owned(&transition), Box::new(self.build(to))));
-        let ty = Type::Transitions(transitions.collect());
+        let ty = Local::Transitions(transitions.collect());
         self.seen[state.index()] = false;
 
         if let Some(variable) = self.looped[state.index()].take() {
-            return Type::Variable(variable, Box::new(ty));
+            return Local::Variable(variable, Box::new(ty));
         }
 
         ty
     }
 }
 
-pub struct Binary<'a, R, L>(&'a Type<R, L>);
-
-impl<'a, R, L> Binary<'a, R, L> {
-    pub fn new(ty: &'a Type<R, L>) -> Self {
-        Self(ty)
-    }
-}
-
-impl<'a, R, L: Display> Display for Binary<'a, R, L> {
+impl<R: Display, L: Display> Display for Local<R, L> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            Type::End => write!(f, "end"),
-            Type::Recursion(variable) => write!(f, "X{}", variable),
-            Type::Variable(variable, ty) => write!(f, "rec X{} . {}", variable, Binary(ty)),
-            Type::Transitions(transitions) => {
+        match self {
+            Self::End => write!(f, "end"),
+            Self::Recursion(variable) => write!(f, "X{}", variable),
+            Self::Variable(variable, ty) => write!(f, "rec X{} . {}", variable, ty),
+            Self::Transitions(transitions) => {
                 assert!(!transitions.is_empty());
 
-                if let [transition] = transitions.as_slice() {
-                    return write!(f, "{}", BinaryTransition::from(transition));
+                if let [(transition, ty)] = transitions.as_slice() {
+                    return write!(f, "{}; {}", transition, ty);
                 }
 
-                write!(f, "[{}", BinaryTransition::from(&transitions[0]))?;
-                for transition in &transitions[1..] {
-                    write!(f, ", {}", BinaryTransition::from(transition))?;
+                let (transition, ty) = &transitions[0];
+                write!(f, "[{}; {}", transition, ty)?;
+
+                for (transition, ty) in &transitions[1..] {
+                    write!(f, ", {}; {}", transition, ty)?;
                 }
 
                 write!(f, "]")
             }
         }
-    }
-}
-
-struct BinaryTransition<'a, R, L>(&'a Transition<R, L>, &'a Type<R, L>);
-
-impl<'a, R, L> From<&'a (Transition<R, L>, Box<Type<R, L>>)> for BinaryTransition<'a, R, L> {
-    fn from((transition, ty): &'a (Transition<R, L>, Box<Type<R, L>>)) -> Self {
-        Self(transition, ty)
-    }
-}
-
-impl<'a, R, L: Display> Display for BinaryTransition<'a, R, L> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}{}; {}", self.0.action, self.0.label, Binary(self.1))
     }
 }
