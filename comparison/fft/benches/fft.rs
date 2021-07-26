@@ -5,44 +5,95 @@ use rand::{thread_rng, Rng};
 use std::sync::Arc;
 use tokio::runtime;
 
-fn gen_complex(rng: &mut impl Rng) -> Complex32 {
-    Complex::new(rng.gen(), rng.gen())
+fn generate(rng: &mut impl Rng, size: usize) -> Arc<[Complex32]> {
+    (0..size)
+        .map(|_| Complex::new(rng.gen(), rng.gen()))
+        .collect()
 }
 
 pub fn criterion_benchmark(criterion: &mut Criterion) {
     let mut rng = thread_rng();
-    let rt = runtime::Builder::new_multi_thread().build().unwrap();
+    let rt = runtime::Builder::new_current_thread().build().unwrap();
     let mut group = criterion.benchmark_group("fft");
 
-    for size in [8, 32, 56, 80, 104] {
-        let input = (0..size).map(|_| gen_complex(&mut rng)).collect::<Arc<_>>();
-        let expected = rustfft::run(input.clone());
+    for size in [8 * 64, 8 * 128, 8 * 256, 8 * 512, 8 * 1024] {
+        let input_rows = [
+            generate(&mut rng, size),
+            generate(&mut rng, size),
+            generate(&mut rng, size),
+            generate(&mut rng, size),
+            generate(&mut rng, size),
+            generate(&mut rng, size),
+            generate(&mut rng, size),
+            generate(&mut rng, size),
+        ];
+
+        let mut input_columns = vec![<[_; 8]>::default(); input_rows[0].len()];
+        for (i, row) in input_rows.iter().enumerate() {
+            for (j, &value) in row.iter().enumerate() {
+                input_columns[j][i] = value;
+            }
+        }
+
+        let expected_columns = rustfft::run(&input_columns);
+        let mut expected_rows = [
+            vec![Default::default(); size],
+            vec![Default::default(); size],
+            vec![Default::default(); size],
+            vec![Default::default(); size],
+            vec![Default::default(); size],
+            vec![Default::default(); size],
+            vec![Default::default(); size],
+            vec![Default::default(); size],
+        ];
+
+        for (i, column) in expected_columns.iter().enumerate() {
+            for (j, &value) in column.iter().enumerate() {
+                expected_rows[j][i] = value;
+            }
+        }
 
         group.bench_function(BenchmarkId::new("mpstthree", size), |bencher| {
             bencher.iter(|| {
-                let actual = mpstthree::run(input.clone());
-                assert_eq!(actual, expected);
+                let actual = mpstthree::run(&input_rows);
+                for (actual, expected) in actual.iter().zip(expected_rows.iter()) {
+                    for (actual, expected) in actual.iter().zip(expected.iter()) {
+                        assert_eq!(actual, expected);
+                    }
+                }
             });
         });
 
         group.bench_function(BenchmarkId::new("rumpsteak", size), |bencher| {
             bencher.iter(|| {
-                let actual = rt.block_on(rumpsteak::run(input.clone()));
-                assert_eq!(actual, expected);
+                let actual = rt.block_on(rumpsteak::run(&input_rows));
+                for (actual, expected) in actual.iter().zip(expected_rows.iter()) {
+                    for (actual, expected) in actual.iter().zip(expected.iter()) {
+                        assert_eq!(actual, expected);
+                    }
+                }
             });
         });
 
         group.bench_function(BenchmarkId::new("rumpsteak_optimized", size), |bencher| {
             bencher.iter(|| {
-                let actual = rt.block_on(rumpsteak::run_optimized(input.clone()));
-                assert_eq!(actual, expected);
+                let actual = rt.block_on(rumpsteak::run_optimized(&input_rows));
+                for (actual, expected) in actual.iter().zip(expected_rows.iter()) {
+                    for (actual, expected) in actual.iter().zip(expected.iter()) {
+                        assert_eq!(actual, expected);
+                    }
+                }
             });
         });
 
         group.bench_function(BenchmarkId::new("rustfft", size), |bencher| {
             bencher.iter(|| {
-                let actual = rustfft::run(input.clone());
-                assert_eq!(actual, expected);
+                let actual = rustfft::run(&input_columns);
+                for (actual, expected) in actual.iter().zip(expected_columns.iter()) {
+                    for (actual, expected) in actual.iter().zip(expected.iter()) {
+                        assert_eq!(actual, expected);
+                    }
+                }
             });
         });
     }

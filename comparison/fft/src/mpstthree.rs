@@ -154,24 +154,24 @@ type DRole5<R> = Role5<Role5<R>>;
 type DRole6<R> = Role6<Role6<R>>;
 type DRole7<R> = Role7<Role7<R>>;
 
-type Butterfly = Send<Complex32, Recv<Complex32, End>>;
-type ButterflyR = Recv<Complex32, Send<Complex32, End>>;
+type Butterfly = Send<Arc<[Complex32]>, Recv<Arc<[Complex32]>, End>>;
+type ButterflyR = Recv<Arc<[Complex32]>, Send<Arc<[Complex32]>, End>>;
 
 #[rustfmt::skip]
 type Butterfly0 = MeshedChannels<Butterfly, Butterfly, End, Butterfly, End, End, End, DRole4<DRole2<DRole1<RoleEnd>>>, Name0>;
 
-fn butterfly_0(s: Butterfly0, x: Complex32) -> Result<Complex32> {
-    let s = send_mpst_0_to_4(x, s);
+fn butterfly_0(s: Butterfly0, x: Arc<[Complex32]>) -> Result<Arc<[Complex32]>> {
+    let s = send_mpst_0_to_4(x.clone(), s);
     let (y, s) = recv_mpst_0_from_4(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
-    let s = send_mpst_0_to_2(x, s);
+    let s = send_mpst_0_to_2(x.clone(), s);
     let (y, s) = recv_mpst_0_from_2(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
-    let s = send_mpst_0_to_1(x, s);
+    let s = send_mpst_0_to_1(x.clone(), s);
     let (y, s) = recv_mpst_0_from_1(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
     close_mpst(s)?;
     Ok(x)
@@ -180,18 +180,18 @@ fn butterfly_0(s: Butterfly0, x: Complex32) -> Result<Complex32> {
 #[rustfmt::skip]
 type Butterfly1 = MeshedChannels<ButterflyR, End, Butterfly, End, Butterfly, End, End, DRole5<DRole3<DRole0<RoleEnd>>>, Name1>;
 
-fn butterfly_1(s: Butterfly1, x: Complex32) -> Result<Complex32> {
-    let s = send_mpst_1_to_5(x, s);
+fn butterfly_1(s: Butterfly1, x: Arc<[Complex32]>) -> Result<Arc<[Complex32]>> {
+    let s = send_mpst_1_to_5(x.clone(), s);
     let (y, s) = recv_mpst_1_from_5(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
-    let s = send_mpst_1_to_3(x, s);
+    let s = send_mpst_1_to_3(x.clone(), s);
     let (y, s) = recv_mpst_1_from_3(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
     let (y, s) = recv_mpst_1_from_0(s)?;
-    let s = send_mpst_1_to_0(x, s);
-    let x = y - x;
+    let s = send_mpst_1_to_0(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| y - x);
 
     close_mpst(s)?;
     Ok(x)
@@ -200,18 +200,18 @@ fn butterfly_1(s: Butterfly1, x: Complex32) -> Result<Complex32> {
 #[rustfmt::skip]
 type Butterfly2 = MeshedChannels<ButterflyR, End, Butterfly, End, End, Butterfly, End, DRole6<DRole0<DRole3<RoleEnd>>>, Name2>;
 
-fn butterfly_2(s: Butterfly2, x: Complex32) -> Result<Complex32> {
-    let s = send_mpst_2_to_6(x, s);
+fn butterfly_2(s: Butterfly2, x: Arc<[Complex32]>) -> Result<Arc<[Complex32]>> {
+    let s = send_mpst_2_to_6(x.clone(), s);
     let (y, s) = recv_mpst_2_from_6(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
     let (y, s) = recv_mpst_2_from_0(s)?;
-    let s = send_mpst_2_to_0(x, s);
-    let x = y - x;
+    let s = send_mpst_2_to_0(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| y - x);
 
-    let s = send_mpst_2_to_3(x, s);
+    let s = send_mpst_2_to_3(x.clone(), s);
     let (y, s) = recv_mpst_2_from_3(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
     close_mpst(s)?;
     Ok(x)
@@ -220,18 +220,18 @@ fn butterfly_2(s: Butterfly2, x: Complex32) -> Result<Complex32> {
 #[rustfmt::skip]
 type Butterfly3 = MeshedChannels<End, ButterflyR, ButterflyR, End, End, End, Butterfly, DRole7<DRole1<DRole2<RoleEnd>>>, Name3>;
 
-fn butterfly_3(s: Butterfly3, x: Complex32) -> Result<Complex32> {
-    let s = send_mpst_3_to_7(x, s);
+fn butterfly_3(s: Butterfly3, x: Arc<[Complex32]>) -> Result<Arc<[Complex32]>> {
+    let s = send_mpst_3_to_7(x.clone(), s);
     let (y, s) = recv_mpst_3_from_7(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
     let (y, s) = recv_mpst_3_from_1(s)?;
-    let s = send_mpst_3_to_1(x, s);
-    let x = crate::rotate_90(y - x);
+    let s = send_mpst_3_to_1(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| crate::rotate_90(y - x));
 
     let (y, s) = recv_mpst_3_from_2(s)?;
-    let s = send_mpst_3_to_2(x, s);
-    let x = y - x;
+    let s = send_mpst_3_to_2(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| y - x);
 
     close_mpst(s)?;
     Ok(x)
@@ -240,18 +240,18 @@ fn butterfly_3(s: Butterfly3, x: Complex32) -> Result<Complex32> {
 #[rustfmt::skip]
 type Butterfly4 = MeshedChannels<ButterflyR, End, End, End, Butterfly, Butterfly, End, DRole0<DRole6<DRole5<RoleEnd>>>, Name4>;
 
-fn butterfly_4(s: Butterfly4, x: Complex32) -> Result<Complex32> {
+fn butterfly_4(s: Butterfly4, x: Arc<[Complex32]>) -> Result<Arc<[Complex32]>> {
     let (y, s) = recv_mpst_4_from_0(s)?;
-    let s = send_mpst_4_to_0(x, s);
-    let x = y - x;
+    let s = send_mpst_4_to_0(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| y - x);
 
-    let s = send_mpst_4_to_6(x, s);
+    let s = send_mpst_4_to_6(x.clone(), s);
     let (y, s) = recv_mpst_4_from_6(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
-    let s = send_mpst_4_to_5(x, s);
+    let s = send_mpst_4_to_5(x.clone(), s);
     let (y, s) = recv_mpst_4_from_5(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
     close_mpst(s)?;
     Ok(x)
@@ -260,18 +260,18 @@ fn butterfly_4(s: Butterfly4, x: Complex32) -> Result<Complex32> {
 #[rustfmt::skip]
 type Butterfly5 = MeshedChannels<End, ButterflyR, End, End, ButterflyR, End, Butterfly, DRole1<DRole7<DRole4<RoleEnd>>>, Name5>;
 
-fn butterfly_5(s: Butterfly5, x: Complex32) -> Result<Complex32> {
+fn butterfly_5(s: Butterfly5, x: Arc<[Complex32]>) -> Result<Arc<[Complex32]>> {
     let (y, s) = recv_mpst_5_from_1(s)?;
-    let s = send_mpst_5_to_1(x, s);
-    let x = y - x;
+    let s = send_mpst_5_to_1(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| y - x);
 
-    let s = send_mpst_5_to_7(x, s);
+    let s = send_mpst_5_to_7(x.clone(), s);
     let (y, s) = recv_mpst_5_from_7(s)?;
-    let x = crate::rotate_45(x + y);
+    let x = crate::zip_with(x, y, |x, y| crate::rotate_45(x + y));
 
     let (y, s) = recv_mpst_5_from_4(s)?;
-    let s = send_mpst_5_to_4(x, s);
-    let x = y - x;
+    let s = send_mpst_5_to_4(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| y - x);
 
     close_mpst(s)?;
     Ok(x)
@@ -280,18 +280,18 @@ fn butterfly_5(s: Butterfly5, x: Complex32) -> Result<Complex32> {
 #[rustfmt::skip]
 type Butterfly6 = MeshedChannels<End, End, ButterflyR, End, ButterflyR, End, Butterfly, DRole2<DRole4<DRole7<RoleEnd>>>, Name6>;
 
-fn butterfly_6(s: Butterfly6, x: Complex32) -> Result<Complex32> {
+fn butterfly_6(s: Butterfly6, x: Arc<[Complex32]>) -> Result<Arc<[Complex32]>> {
     let (y, s) = recv_mpst_6_from_2(s)?;
-    let s = send_mpst_6_to_2(x, s);
-    let x = crate::rotate_90(y - x);
+    let s = send_mpst_6_to_2(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| crate::rotate_90(y - x));
 
     let (y, s) = recv_mpst_6_from_4(s)?;
-    let s = send_mpst_6_to_4(x, s);
-    let x = y - x;
+    let s = send_mpst_6_to_4(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| y - x);
 
-    let s = send_mpst_6_to_7(x, s);
+    let s = send_mpst_6_to_7(x.clone(), s);
     let (y, s) = recv_mpst_6_from_7(s)?;
-    let x = x + y;
+    let x = crate::zip_with(x, y, |x, y| x + y);
 
     close_mpst(s)?;
     Ok(x)
@@ -300,97 +300,94 @@ fn butterfly_6(s: Butterfly6, x: Complex32) -> Result<Complex32> {
 #[rustfmt::skip]
 type Butterfly7 = MeshedChannels<End, End, End, ButterflyR, End, ButterflyR, ButterflyR, DRole3<DRole5<DRole6<RoleEnd>>>, Name7>;
 
-fn butterfly_7(s: Butterfly7, x: Complex32) -> Result<Complex32> {
+fn butterfly_7(s: Butterfly7, x: Arc<[Complex32]>) -> Result<Arc<[Complex32]>> {
     let (y, s) = recv_mpst_7_from_3(s)?;
-    let s = send_mpst_7_to_3(x, s);
-    let x = crate::rotate_90(y - x);
+    let s = send_mpst_7_to_3(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| crate::rotate_90(y - x));
 
     let (y, s) = recv_mpst_7_from_5(s)?;
-    let s = send_mpst_7_to_5(x, s);
-    let x = crate::rotate_135(y - x);
+    let s = send_mpst_7_to_5(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| crate::rotate_135(y - x));
 
     let (y, s) = recv_mpst_7_from_6(s)?;
-    let s = send_mpst_7_to_6(x, s);
-    let x = y - x;
+    let s = send_mpst_7_to_6(x.clone(), s);
+    let x = crate::zip_with(x, y, |x, y| y - x);
 
     close_mpst(s)?;
     Ok(x)
 }
 
-struct ComplexCell(*mut Complex32);
+struct ComplexCell(*mut Arc<[Complex32]>);
 
 unsafe impl marker::Send for ComplexCell {}
 
-pub fn run(input: Arc<[Complex32]>) -> Vec<Complex32> {
-    let mut threads = Vec::with_capacity(input.len() / 8);
-    let mut output = vec![Default::default(); input.len()];
+pub fn run(input: &[Arc<[Complex32]>; 8]) -> [Arc<[Complex32]>; 8] {
+    let (i0, i1, i2, i3, i4, i5, i6, i7) = (
+        input[0].clone(),
+        input[1].clone(),
+        input[2].clone(),
+        input[3].clone(),
+        input[4].clone(),
+        input[5].clone(),
+        input[6].clone(),
+        input[7].clone(),
+    );
 
-    for i in (0..input.len()).step_by(8) {
-        let (r0, r1, r2, r3, r4, r5, r6, r7) = fork_mpst(
-            {
-                let (input, output) = (input.clone(), ComplexCell(&mut output[i] as *mut _));
-                move |s| {
-                    unsafe { *output.0 = butterfly_0(s, input[i])? };
-                    Ok(())
-                }
-            },
-            {
-                let (input, output) = (input.clone(), ComplexCell(&mut output[i + 4] as *mut _));
-                move |s| {
-                    unsafe { *output.0 = butterfly_1(s, input[i + 1])? };
-                    Ok(())
-                }
-            },
-            {
-                let (input, output) = (input.clone(), ComplexCell(&mut output[i + 2] as *mut _));
-                move |s| {
-                    unsafe { *output.0 = butterfly_2(s, input[i + 2])? };
-                    Ok(())
-                }
-            },
-            {
-                let (input, output) = (input.clone(), ComplexCell(&mut output[i + 6] as *mut _));
-                move |s| {
-                    unsafe { *output.0 = butterfly_3(s, input[i + 3])? };
-                    Ok(())
-                }
-            },
-            {
-                let (input, output) = (input.clone(), ComplexCell(&mut output[i + 1] as *mut _));
-                move |s| {
-                    unsafe { *output.0 = butterfly_4(s, input[i + 4])? };
-                    Ok(())
-                }
-            },
-            {
-                let (input, output) = (input.clone(), ComplexCell(&mut output[i + 5] as *mut _));
-                move |s| {
-                    unsafe { *output.0 = butterfly_5(s, input[i + 5])? };
-                    Ok(())
-                }
-            },
-            {
-                let (input, output) = (input.clone(), ComplexCell(&mut output[i + 3] as *mut _));
-                move |s| {
-                    unsafe { *output.0 = butterfly_6(s, input[i + 6])? };
-                    Ok(())
-                }
-            },
-            {
-                let (input, output) = (input.clone(), ComplexCell(&mut output[i + 7] as *mut _));
-                move |s| {
-                    unsafe { *output.0 = butterfly_7(s, input[i + 7])? };
-                    Ok(())
-                }
-            },
-        );
+    let mut output = input.clone();
+    let (o0, o1, o2, o3, o4, o5, o6, o7) = (
+        ComplexCell(&mut output[0]),
+        ComplexCell(&mut output[1]),
+        ComplexCell(&mut output[2]),
+        ComplexCell(&mut output[3]),
+        ComplexCell(&mut output[4]),
+        ComplexCell(&mut output[5]),
+        ComplexCell(&mut output[6]),
+        ComplexCell(&mut output[7]),
+    );
 
-        threads.extend([r0, r1, r2, r3, r4, r5, r6, r7]);
-    }
+    let (r0, r1, r2, r3, r4, r5, r6, r7) = fork_mpst(
+        move |s| {
+            unsafe { *o0.0 = butterfly_0(s, i0)? };
+            Ok(())
+        },
+        move |s| {
+            unsafe { *o4.0 = butterfly_1(s, i1)? };
+            Ok(())
+        },
+        move |s| {
+            unsafe { *o2.0 = butterfly_2(s, i2)? };
+            Ok(())
+        },
+        move |s| {
+            unsafe { *o6.0 = butterfly_3(s, i3)? };
+            Ok(())
+        },
+        move |s| {
+            unsafe { *o1.0 = butterfly_4(s, i4)? };
+            Ok(())
+        },
+        move |s| {
+            unsafe { *o5.0 = butterfly_5(s, i5)? };
+            Ok(())
+        },
+        move |s| {
+            unsafe { *o3.0 = butterfly_6(s, i6)? };
+            Ok(())
+        },
+        move |s| {
+            unsafe { *o7.0 = butterfly_7(s, i7)? };
+            Ok(())
+        },
+    );
 
-    for thread in threads {
-        thread.join().unwrap();
-    }
+    r0.join().unwrap();
+    r1.join().unwrap();
+    r2.join().unwrap();
+    r3.join().unwrap();
+    r4.join().unwrap();
+    r5.join().unwrap();
+    r6.join().unwrap();
+    r7.join().unwrap();
 
     output
 }

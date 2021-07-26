@@ -1,11 +1,7 @@
 #![allow(clippy::nonstandard_macro_braces)]
 
 use argh::FromArgs;
-use rumpsteak::fsm::{
-    self,
-    local::{Binary, Type},
-    Action, Dot, Normalizer, Petrify, Transition, TransitionError,
-};
+use rumpsteak::fsm::{self, Action, Dot, Local, Normalizer, Petrify, Transition, TransitionError};
 use std::{result, str::FromStr};
 
 type Fsm = fsm::Fsm<&'static str, &'static str>;
@@ -95,6 +91,6 @@ fn main() {
             let sink = normalizer.normalize(&sink().unwrap());
             println!("{}\n\n{}", Petrify::new(&source), Petrify::new(&sink));
         }
-        Target::Concur19 => println!("{}", Binary::new(&Type::new(&source))),
+        Target::Concur19 => println!("{}", Local::new(&source.to_binary())),
     }
 }

@@ -1,10 +1,14 @@
 use num_complex::Complex32;
 use rustfft::{algorithm::butterflies::Butterfly8, Fft, FftDirection};
-use std::sync::Arc;
 
-pub fn run(input: Arc<[Complex32]>) -> Vec<Complex32> {
+pub fn run(input: &[[Complex32; 8]]) -> Vec<[Complex32; 8]> {
     let butterfly = Butterfly8::new(FftDirection::Forward);
-    let mut output = input.as_ref().to_owned();
-    butterfly.process(&mut output);
-    output
+    input
+        .iter()
+        .map(|vector| {
+            let mut vector = vector.to_owned();
+            butterfly.process(&mut vector);
+            vector
+        })
+        .collect()
 }
