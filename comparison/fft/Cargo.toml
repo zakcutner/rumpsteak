@@ -25,6 +25,7 @@ futures = "0.3"
 mpst-seq = "0.0"
 mpstthree = "0.0"
 num-complex = "0.4"
+paste = "1.0"
 rumpsteak = { path = "../.." }
 rumpsteak-oneshot = { path = "../../oneshot" }
 rustfft = "6.0"

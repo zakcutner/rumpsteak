@@ -1,9 +1,11 @@
 use num_complex::Complex32;
 use std::{f32::consts::FRAC_1_SQRT_2, sync::Arc};
 
+pub mod ferrite;
 pub mod mpstthree;
 pub mod rumpsteak;
 pub mod rustfft;
+pub mod sesh;
 
 fn zip_with(
     x: Arc<[Complex32]>,
