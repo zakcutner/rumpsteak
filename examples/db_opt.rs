@@ -1,4 +1,3 @@
-
 // Here we use this FSM for k instead of the naive one.
 // digraph k {
 //   0;
@@ -6,21 +5,22 @@
 //   2;
 //   3;
 //   4;
-//   
-//   
+//
+//
 //   0 -> 1 [label="s!ready()", ];
 //   1 -> 2 [label="s!ready()", ];
 //   2 -> 3 [label="s?copy()", ];
 //   3 -> 4 [label="t?ready()", ];
 //   4 -> 1 [label="t!copy()", ];
-//   
+//
 //   }
 
 use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use ::futures::{executor, try_join};
 #[allow(unused_imports)]
 use ::rumpsteak::{
-    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send, try_session
+    channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
+    Select, Send,
 };
 use std::error::Error;
 
@@ -83,7 +83,6 @@ struct DbS(Receive<K, Ready, Send<K, Copy, DbS>>);
 #[session]
 struct DbT(Send<K, Ready, Receive<K, Copy, DbT>>);
 
-
 async fn s(role: &mut S) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: DbS<'_, _>| async {
         let mut s_rec = s.0;
@@ -99,7 +98,7 @@ async fn k(role: &mut K) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: DbK<'_, _>| async {
         let s = s.send(Ready).await?;
         let mut s_snd = s.0;
-        loop{
+        loop {
             let s = s_snd.send(Ready).await?;
             let (Copy, s) = s.receive().await?;
             let (Ready, s) = s.receive().await?;
@@ -112,7 +111,7 @@ async fn k(role: &mut K) -> Result<(), Box<dyn Error>> {
 async fn t(role: &mut T) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: DbT<'_, _>| async {
         let mut s_snd = s.0;
-        loop{
+        loop {
             let s = s_snd.send(Ready).await?;
             let (Copy, s) = s.receive().await?;
             s_snd = s.0;
