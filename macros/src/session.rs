@@ -148,11 +148,19 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
     let ident = &input.ident;
     let exclude = idents_set(&input.generics.params);
 
+    let mut generics = input.generics.clone();
     punctuated_prepend(
-        &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak::Role),
+        &mut generics.params,
+        parse_quote!('__q, '__r, __R: ::rumpsteak::Role + '__r),
     );
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (impl_generics, _, _) = generics.split_for_impl();
+
+    let mut generics = input.generics.clone();
+    punctuated_prepend(
+        &mut generics.params,
+        parse_quote!('__q, __R: ::rumpsteak::Role),
+    );
+    let (_, ty_generics, where_clause) = generics.split_for_impl();
 
     let mut idents = Vec::with_capacity(input.variants.len());
     let mut labels = Vec::with_capacity(input.variants.len());
@@ -188,6 +196,12 @@ fn session_enum(mut input: ItemEnum) -> Result<TokenStream> {
             }
         });
     }
+
+    punctuated_prepend(
+        &mut input.generics.params,
+        parse_quote!('__r, __R: ::rumpsteak::Role),
+    );
+    let (impl_generics, ty_generics, _) = input.generics.split_for_impl();
 
     #[cfg(feature = "serialize")]
     {
