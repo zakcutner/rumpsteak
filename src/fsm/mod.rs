@@ -288,7 +288,7 @@ impl<'a, R: Eq + Hash, L: Eq + Hash> Normalizer<'a, R, L> {
                         action: choices.action,
                     }),
                 },
-                |_, label| Self::label(labels, &label),
+                |_, label| Self::label(labels, label),
             ),
         }
     }
