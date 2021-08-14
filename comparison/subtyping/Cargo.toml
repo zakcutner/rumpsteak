@@ -1,0 +1,32 @@
+[package]
+name = "subtyping"
+version = "0.0.0"
+authors = ["Zak Cutner <me@zakcutner.uk>"]
+edition = "2018"
+description = "Session types for asynchronous communication between multiple parties."
+readme = "../README.md"
+repository = "https://github.com/zakcutner/rumpsteak"
+license = "MIT"
+keywords = ["async", "deadlock", "safety", "session", "types"]
+categories = ["asynchronous", "concurrency"]
+publish = false
+
+[[bin]]
+name = "double_buffering"
+path = "src/double_buffering.rs"
+
+[[bin]]
+name = "nested_choice"
+path = "src/nested_choice.rs"
+
+[[bin]]
+name = "ring"
+path = "src/ring.rs"
+
+[[bin]]
+name = "stream"
+path = "src/stream.rs"
+
+[dependencies]
+argh = "0.1"
+rumpsteak = { path = "../..", default-features = false, features = ["fsm"] }
