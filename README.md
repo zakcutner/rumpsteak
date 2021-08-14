@@ -13,14 +13,17 @@ Rumpsteak is a Rust framework for _safely_ and _efficiently_ implementing
 [message-passing](https://doc.rust-lang.org/book/ch16-02-message-passing.html)
 [asynchronous](https://rust-lang.github.io/async-book/) programs. It uses
 multiparty session types to statically guarantee the absence of communication
-errors such as deadlocks.
+errors such as deadlocks and asynchronous subtyping to allow optimizing
+communications.
 
-Multiparty session types verify the safety of message-passing protocols, as
-described in
-[A Gentle Introduction to Multiparty Asynchronous Session Types](http://mrg.doc.ic.ac.uk/publications/a-gentle-introduction-to-multiparty-asynchronous-session-types/paper.pdf).
-Code generation of protocols into Rumpsteak's API using the
-[νScr toolkit](https://github.com/nuscr/nuscr) is currently
-[in progress](generate).
+Multiparty session types (MPST) verify the safety of message-passing protocols,
+as described in [A Very Gentle Introduction to Multiparty Session
+Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf).
+Asynchronous subtyping, introduced for MPST in [Precise Subtyping for
+Asynchronous Multiparty
+Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf),
+verifies the reordering of messages to create more optimized implementations
+than are usually possible with MPST.
 
 ## Features
 
@@ -108,6 +111,32 @@ fn main() {
     });
 }
 ```
+
+## Structure
+
+#### `benches/`
+
+Benchmark suite to track Rumpsteak's performance over time.
+
+#### `comparison/`
+
+Comparison with some other Rust implementations of session types.
+
+#### `examples/`
+
+Many examples of using Rumpsteak from popular protocols.
+
+#### `generate/`
+
+Automatic code generation from finite state machines to Rumpsteak's API.
+
+#### `macros/`
+
+Crate for procedural macros used within Rumpsteak's API.
+
+#### `oneshot/`
+
+Outdated experimental implementation of using one-shot channels for communication.
 
 ## Licensing
 
