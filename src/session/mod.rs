@@ -6,7 +6,12 @@ pub mod serialize;
 pub use rumpsteak_macros::{session, Message, Role, Roles};
 
 use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
-use std::{any::Any, convert::Infallible, future::Future, marker::PhantomData};
+use std::{
+    any::Any,
+    convert::Infallible,
+    future::Future,
+    marker::{self, PhantomData},
+};
 use thiserror::Error;
 
 pub type SendError<Q, R> = <<Q as Route<R>>::Route as Sink<<Q as Role>::Message>>::Error;
@@ -26,6 +31,26 @@ pub trait Message<L>: Sized {
 }
 
 impl<L: 'static> Message<L> for Box<dyn Any> {
+    fn upcast(label: L) -> Self {
+        Box::new(label)
+    }
+
+    fn downcast(self) -> Result<L, Self> {
+        self.downcast().map(|label| *label)
+    }
+}
+
+impl<L: marker::Send + 'static> Message<L> for Box<dyn Any + marker::Send> {
+    fn upcast(label: L) -> Self {
+        Box::new(label)
+    }
+
+    fn downcast(self) -> Result<L, Self> {
+        self.downcast().map(|label| *label)
+    }
+}
+
+impl<L: marker::Send + Sync + 'static> Message<L> for Box<dyn Any + marker::Send + Sync> {
     fn upcast(label: L) -> Self {
         Box::new(label)
     }
