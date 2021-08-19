@@ -8,6 +8,7 @@ pub trait Pair<P: Pair<Self>>: Sized {
     fn pair() -> (Self, P);
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Nil;
 
 impl Pair<Nil> for Nil {
