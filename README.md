@@ -118,6 +118,10 @@ fn main() {
 
 Benchmark suite to track Rumpsteak's performance over time.
 
+#### `caching/`
+
+HTTP cache case study backed by Redis.
+
 #### `comparison/`
 
 Comparison with some other Rust implementations of session types.
