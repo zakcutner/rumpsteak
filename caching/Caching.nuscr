@@ -1,0 +1,21 @@
+global protocol Caching(role Client, role Proxy, role Cache, role Origin) {
+  Request from Client to Proxy;
+  Lock from Proxy to Cache;
+  Locked from Cache to Proxy;
+  Load from Proxy to Cache;
+  Entry from Cache to Proxy;
+  Request from Proxy to Origin;
+  Response from Origin to Proxy;
+  Response from Proxy to Client;
+  rec Loop {
+    choice at Proxy {
+      Store from Proxy to Cache;
+      continue Loop;
+    } or {
+      Remove from Proxy to Cache;
+      continue Loop;
+    } or {
+      Unlock from Proxy to Cache;
+    }
+  }
+}

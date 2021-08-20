@@ -71,4 +71,4 @@ debug = true
 debug = true
 
 [workspace]
-members = ["generate", "macros", "oneshot"]
+members = ["caching", "generate", "macros", "oneshot"]
