@@ -1,0 +1,18 @@
+digraph C {
+  0;
+  2;
+  3;
+  5;
+  7;
+  9;
+  10;
+  
+  
+  0 -> 2 [label="S?login(i32)", ];
+  0 -> 9 [label="S?cancel(i32)", ];
+  2 -> 3 [label="A!password(i32)", ];
+  3 -> 5 [label="S?again(i32)", ];
+  3 -> 7 [label="S?Auth(i32)", ];
+  9 -> 10 [label="A!quit(i32)", ];
+  
+  }

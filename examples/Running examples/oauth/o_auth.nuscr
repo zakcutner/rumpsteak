@@ -1,0 +1,23 @@
+global protocol Proto(role A, role C, role S)
+{
+    choice at S
+    {
+        login(i32) from S to C;
+        password(i32) from C to A;
+        choice at A
+        {
+             Auth(i32) from A to S;
+             Auth(i32) from S to C;
+        }
+        or
+        {
+             again(i32) from A to S;
+             again(i32) from S to C;
+        }
+    }
+    or
+    {
+        cancel(i32) from S to C;
+        quit(i32) from C to A;
+    }
+}

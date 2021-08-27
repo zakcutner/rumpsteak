@@ -1,0 +1,14 @@
+digraph A {
+  0;
+  2;
+  4;
+  6;
+  8;
+  
+  
+  0 -> 2 [label="C?quit(i32)", ];
+  0 -> 4 [label="C?password(i32)", ];
+  4 -> 6 [label="S!Auth(i32)", ];
+  4 -> 8 [label="S!again(i32)", ];
+  
+  }
