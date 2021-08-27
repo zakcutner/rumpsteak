@@ -1,0 +1,20 @@
+digraph C {
+  0;
+  1;
+  2;
+  4;
+  5;
+  6;
+  8;
+  9;
+  
+  
+  0 -> 1 [label="S?empty3(i32)", ];
+  1 -> 2 [label="A?empty4(i32)", ];
+  2 -> 4 [label="A!valid(i32)", ];
+  2 -> 8 [label="A!quit()", ];
+  4 -> 5 [label="S!valid(i32)", ];
+  5 -> 6 [label="S?empty5(i32)", ];
+  8 -> 9 [label="S!quit()", ];
+  
+  }

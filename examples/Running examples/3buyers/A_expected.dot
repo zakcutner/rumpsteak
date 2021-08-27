@@ -1,0 +1,16 @@
+digraph A {
+  0;
+  1;
+  2;
+  3;
+  5;
+  7;
+  
+  
+  0 -> 1 [label="S!empty1(i32)", ];
+  1 -> 2 [label="S?empty2(i32)", ];
+  2 -> 3 [label="C!empty4(i32)", ];
+  3 -> 5 [label="C?valid(i32)", ];
+  3 -> 7 [label="C?quit()", ];
+  
+  }
