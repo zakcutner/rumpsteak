@@ -1,6 +1,6 @@
 #!/bin/sh
 
-GENERATE="../../../target/debug/rumpsteak-generate"
+GENERATE="$(which rumpsteak-generate || echo "../../../target/debug/rumpsteak-generate")"
 
 failwith() {
 	echo [FAIL] $1 1>&2
@@ -34,13 +34,18 @@ clean() {
 	rm oauth.rs
 }
 
-if [ "$1" = "clean" ]; then
-	echo "Cleaning files"
-	clean
-else
-	nuscr2dot
-	checkdots
-	dot2rs
-	checkrs
-	echo "Test successful" 1>&2
-fi
+case "$1" in
+	"clean")
+		clean
+		break ;;
+	"config")
+		echo "$GENERATE"
+		break ;;
+	*)
+		nuscr2dot
+		checkdots
+		dot2rs
+		checkrs
+		echo "Test successful" 1>&2
+		;;
+esac
