@@ -1,0 +1,9 @@
+digraph s {
+  1;
+  2;
+  
+  
+  1 -> 2 [label="k?ready()", ];
+  2 -> 1 [label="k!copy()", ];
+  
+  }

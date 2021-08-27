@@ -1,0 +1,9 @@
+global protocol DB (role s, role k, role t) {
+	rec loop {
+		ready() from k to s;
+		copy() from s to k;
+		ready() from t to k;
+		copy() from k to t;
+		continue loop;
+	}
+}
