@@ -1,6 +1,6 @@
 #!/bin/sh
 
-GENERATE="$(which rumpsteak-generate || echo "../../../target/debug/rumpsteak-generate")"
+GENERATE="$(which rumpsteak-generate || if [ -e "../../../target/debug/rumpsteak-generate" ]; then echo "../../../target/debug/rumpsteak-generate"; fi || echo "../../../target/release/rumpsteak-generate")"
 
 failwith() {
 	echo [FAIL] $1 1>&2
