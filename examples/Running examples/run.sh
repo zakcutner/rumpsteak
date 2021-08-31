@@ -1,6 +1,9 @@
 #!/bin/sh
 
-DIR=$(pwd)
+INITDIR="$(pwd)"
+DIR="$(dirname "$0")"
+cd "$DIR"
+DIR="$(pwd)"
 
 run() {
 	for example in ./*; do 
@@ -12,6 +15,7 @@ run() {
 			echo ""
 		fi
 	done
+	cd $INITDIR
 }
 
 clean() {
@@ -24,11 +28,14 @@ clean() {
 			echo ""
 		fi
 	done
+	cd $INITDIR
 }
 
 case "$1" in 
 	"clean")
 		clean
+		break;;
+	"quit")
 		break;;
 	*) 
 		run
