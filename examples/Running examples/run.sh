@@ -7,28 +7,28 @@ DIR="$(pwd)"
 
 run() {
 	for example in ./*; do 
-		if [ -e $example/run.sh ]; then
+		if [ -e "$example"/run.sh ]; then
 			echo "Running example $example"
-			cd $example
+			cd "$example"
 			./run.sh
 			cd "$DIR"
 			echo ""
 		fi
 	done
-	cd $INITDIR
+	cd "$INITDIR"
 }
 
 clean() {
 	for example in ./*; do 
-		if [ -e $example/run.sh ]; then
+		if [ -e "$example"/run.sh ]; then
 			echo "Cleaning example $example"
-			cd $example
+			cd "$example"
 			./run.sh clean
 			cd "$DIR"
 			echo ""
 		fi
 	done
-	cd $INITDIR
+	cd "$INITDIR"
 }
 
 case "$1" in 
