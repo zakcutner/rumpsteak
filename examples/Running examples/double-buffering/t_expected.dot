@@ -1,9 +1,9 @@
 digraph t {
-  1;
+  0;
   2;
   
   
-  1 -> 2 [label="k!ready()", ];
-  2 -> 1 [label="k?copy()", ];
+  0 -> 2 [label="k!ready()", ];
+  2 -> 0 [label="k?copy()", ];
   
   }

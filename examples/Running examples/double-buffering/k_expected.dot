@@ -1,13 +1,13 @@
 digraph k {
-  1;
+  0;
   2;
   3;
   4;
   
   
-  1 -> 2 [label="s!ready()", ];
+  0 -> 2 [label="s!ready()", ];
   2 -> 3 [label="s?copy()", ];
   3 -> 4 [label="t?ready()", ];
-  4 -> 1 [label="t!copy()", ];
+  4 -> 0 [label="t!copy()", ];
   
   }
