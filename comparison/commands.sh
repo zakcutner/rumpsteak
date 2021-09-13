@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/bin/sh
 
 cargo build --bins
 
@@ -9,16 +9,27 @@ NESTED_CHOICE="$TARGET/nested_choice"
 RING="$TARGET/ring"
 DOUBLE_BUFFERING="$TARGET/double_buffering"
 
-mkdir -p data/stream/{rumpsteak,kmc,concur19}
-for i in {0..100..10}; do
+for bench in stream nested_choice ring double_buffering; do
+	for bin in rumpsteak kmc concur19; do
+		mkdir -p data/"$bench"/"$bin"
+	done
+done
+
+for typ in subtype supertype; do
+	for bin in rumpsteak concur19; do
+		mkdir data/nested_choice/"$bin"/"$typ"
+	done
+
+	mkdir data/ring/rumpsteak/"$typ"
+done
+
+for i in $(seq 0 10 100); do
     "$STREAM" --unrolls $i rumpsteak > "data/stream/rumpsteak/$i.txt";
     "$STREAM" --unrolls $i kmc > "data/stream/kmc/$i.txt";
     "$STREAM" --unrolls $i concur19 > "data/stream/concur19/$i.txt";
 done
 
-mkdir -p data/nested_choice/{rumpsteak,kmc,concur19}
-mkdir data/nested_choice/{rumpsteak,concur19}/{subtype,supertype}
-for i in {1..5}; do
+for i in $(seq 5); do
     "$NESTED_CHOICE" --levels $i rumpsteak > "data/nested_choice/rumpsteak/subtype/$i.txt";
     "$NESTED_CHOICE" --levels $i --reverse rumpsteak > "data/nested_choice/rumpsteak/supertype/$i.txt";
     "$NESTED_CHOICE" --levels $i kmc > "data/nested_choice/kmc/$i.txt";
@@ -26,16 +37,14 @@ for i in {1..5}; do
     "$NESTED_CHOICE" --levels $i --reverse concur19 > "data/nested_choice/concur19/supertype/$i.txt";
 done
 
-mkdir -p data/ring/{rumpsteak,kmc}
 mkdir data/ring/rumpsteak/{subtype,supertype}
-for i in {2..30..2}; do
+for i in $(seq 2 2 30); do
     "$RING" --roles $i -O rumpsteak > "data/ring/rumpsteak/subtype/$i.txt";
     "$RING" --roles $i rumpsteak > "data/ring/rumpsteak/supertype/$i.txt";
     "$RING" --roles $i -O kmc > "data/ring/kmc/$i.txt";
 done
 
-mkdir -p data/double_buffering/{rumpsteak,kmc}
-for i in {0..100..5}; do
+for i in $(seq 0 5 100); do
     "$DOUBLE_BUFFERING" --unrolls $i rumpsteak > "data/double_buffering/rumpsteak/$i.txt";
     "$DOUBLE_BUFFERING" --unrolls $i kmc > "data/double_buffering/kmc/$i.txt";
 done
