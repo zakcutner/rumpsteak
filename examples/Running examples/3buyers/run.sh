@@ -9,7 +9,7 @@ failwith() {
 
 nuscr2dot() {
 	for endpoint in A C S; do
-		nuscr -fsm $endpoint@ThreeBuyers three_buyers.nuscr | sed s/G/$endpoint/ > $endpoint.dot || failwith "Can not generate .dot files (nuscr error)."
+		nuscr --fsm $endpoint@ThreeBuyers three_buyers.nuscr | sed s/G/$endpoint/ > $endpoint.dot || failwith "Can not generate .dot files (nuscr error)."
 	done
 }
 

@@ -14,7 +14,7 @@ warn() {
 
 nuscr2dot() {
 	for endpoint in s k t; do
-		nuscr -fsm $endpoint@DB db.nuscr | sed s/G/$endpoint/ > $endpoint.dot || failwith "Can not generate .dot files (nuscr error)."
+		nuscr --fsm $endpoint@DB db.nuscr | sed s/G/$endpoint/ > $endpoint.dot || failwith "Can not generate .dot files (nuscr error)."
 	done
 }
 
