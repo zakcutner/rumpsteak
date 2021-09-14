@@ -1,7 +1,7 @@
 use super::{fsm::FsmError, Error, Merge, ParseError, PushError, Spanned};
-use crate::fsm::{
-    self, Action, Associativity, BinaryOp, Message, NamedParameter, Operator, Parameters,
-    Transition, UnaryOp,
+use crate::{
+    Action, Associativity, BinaryOp, Message, NamedParameter, Operator, Parameters, Transition,
+    UnaryOp,
 };
 use logos::Logos;
 use std::{convert::Infallible, hash::Hash};
@@ -269,7 +269,7 @@ impl From<ExpressionError> for ParseError {
 }
 
 fn apply_operator(
-    outputs: &mut Vec<Spanned<fsm::Expression<String>>>,
+    outputs: &mut Vec<Spanned<crate::Expression<String>>>,
     operator: Spanned<Op>,
 ) -> Result<(), Spanned<ExpressionError>> {
     let (span, operator) = operator.into_parts();
@@ -280,7 +280,7 @@ fn apply_operator(
             let (output_span, output) = output.into_parts();
             Ok(Spanned::new(
                 span.merge(&output_span),
-                fsm::Expression::Unary(op, output.into()),
+                crate::Expression::Unary(op, output.into()),
             ))
         }
         Op::Binary(op) => {
@@ -289,7 +289,7 @@ fn apply_operator(
             let ((right_span, right), (left_span, left)) = (right.into_parts(), left.into_parts());
             Ok(Spanned::new(
                 left_span.merge(&right_span),
-                fsm::Expression::Binary(op, left.into(), right.into()),
+                crate::Expression::Binary(op, left.into(), right.into()),
             ))
         }
     };
@@ -301,7 +301,7 @@ fn apply_operator(
 }
 
 fn push_operator(
-    outputs: &mut Vec<Spanned<fsm::Expression<String>>>,
+    outputs: &mut Vec<Spanned<crate::Expression<String>>>,
     operators: &mut Vec<Spanned<Op>>,
     operator: Spanned<Op>,
 ) -> Result<(), Spanned<ExpressionError>> {
@@ -379,7 +379,7 @@ fn parse_binary_op(tokens: &mut Lexer) -> Option<Spanned<BinaryOp>> {
 fn parse_expression(
     tokens: &mut Lexer,
     terminal: TokenId,
-) -> Option<Option<Spanned<fsm::Expression<String>>>> {
+) -> Option<Option<Spanned<crate::Expression<String>>>> {
     let (mut outputs, mut operators) = (Vec::new(), Vec::new());
     'e: loop {
         if tokens.next_if(terminal).is_some() {
@@ -387,17 +387,17 @@ fn parse_expression(
         }
 
         if let Some(token) = tokens.next_if(TokenId::Identifier) {
-            outputs.push(token.map(|token| fsm::Expression::Name(token.into_identifier())));
+            outputs.push(token.map(|token| crate::Expression::Name(token.into_identifier())));
             continue;
         }
 
         if let Some(token) = tokens.next_if(TokenId::Boolean) {
-            outputs.push(token.map(|token| fsm::Expression::Boolean(token.into_boolean())));
+            outputs.push(token.map(|token| crate::Expression::Boolean(token.into_boolean())));
             continue;
         }
 
         if let Some(token) = tokens.next_if(TokenId::Number) {
-            outputs.push(token.map(|token| fsm::Expression::Number(token.into_number())));
+            outputs.push(token.map(|token| crate::Expression::Number(token.into_number())));
             continue;
         }
 
@@ -476,7 +476,7 @@ pub(super) trait Expression: Eq + Hash + Sized {
 
 impl Expression for Infallible {}
 
-impl Expression for fsm::Expression<String> {
+impl Expression for crate::Expression<String> {
     fn parse_refinement(tokens: &mut Lexer) -> Option<Option<Spanned<Self>>> {
         if tokens.next_if(TokenId::LeftBrace).is_some() {
             return parse_expression(tokens, TokenId::RightBrace);

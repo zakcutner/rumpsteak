@@ -1,4 +1,4 @@
-use crate::fsm::TransitionRef;
+use crate::TransitionRef;
 use std::{
     convert::Infallible,
     fmt::{self, Display, Formatter},

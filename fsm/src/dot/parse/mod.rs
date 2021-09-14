@@ -4,7 +4,7 @@ pub mod fsm;
 pub mod transition;
 
 use self::fsm::FsmError;
-use crate::fsm::{Expression, Fsm};
+use crate::{Expression, Fsm};
 use logos::{Logos, Span};
 use std::{
     convert::Infallible,

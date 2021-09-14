@@ -1,12 +1,10 @@
 #![allow(clippy::nonstandard_macro_braces)]
 
 use argh::FromArgs;
-use rumpsteak::fsm::{
-    self, Action, AddTransitionError, Dot, Message, Normalizer, Petrify, Transition,
-};
+use rumpsteak_fsm::{Action, AddTransitionError, Dot, Message, Normalizer, Petrify, Transition};
 use std::{convert::Infallible, error::Error, result, str::FromStr};
 
-type Fsm = fsm::Fsm<&'static str, &'static str, Infallible>;
+type Fsm = rumpsteak_fsm::Fsm<&'static str, &'static str, Infallible>;
 
 type Result<T, E = AddTransitionError> = result::Result<T, E>;
 

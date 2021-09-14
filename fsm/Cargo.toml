@@ -1,0 +1,31 @@
+[package]
+name = "rumpsteak-fsm"
+version = "0.1.0"
+authors = ["Zak Cutner <me@zakcutner.uk>"]
+edition = "2018"
+description = "Session types for asynchronous communication between multiple parties."
+readme = "README.md"
+repository = "https://github.com/zakcutner/rumpsteak"
+license = "MIT"
+keywords = ["async", "deadlock", "safety", "session", "types"]
+categories = ["asynchronous", "concurrency"]
+
+[[bin]]
+name = "subtype"
+path = "src/subtype/main.rs"
+required-features = ["argh", "atty", "parsing", "subtyping", "termcolor"]
+
+[dependencies]
+argh = { version = "0.1", optional = true }
+atty = { version = "0.2", optional = true }
+bitvec = { version = "0.22", optional = true }
+codespan-reporting = { version = "0.11", optional = true }
+logos = { version = "0.12", optional = true }
+memchr = { version = "2.4", optional = true }
+petgraph = "0.6"
+termcolor = { version = "1.1", optional = true }
+thiserror = "1.0"
+
+[features]
+parsing = ["bitvec", "codespan-reporting", "logos", "memchr"]
+subtyping = []

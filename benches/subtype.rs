@@ -5,8 +5,9 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use rumpsteak::{
-    channel::Bidirectional, serialize, session, subtype, Branch, Message, Role, Roles, Select, Send,
+    channel::Bidirectional, serialize, session, Branch, Message, Role, Roles, Select, Send,
 };
+use rumpsteak_fsm::subtype;
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 

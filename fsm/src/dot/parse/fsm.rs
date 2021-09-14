@@ -2,7 +2,7 @@ use super::{
     transition::{self, Expression, TransitionError},
     Merge, ParseErrors, PushError, Spanned,
 };
-use crate::fsm::{AddTransitionError, Fsm, StateIndex, Transition};
+use crate::{AddTransitionError, Fsm, StateIndex, Transition};
 use bitvec::{bitbox, boxed::BitBox};
 use logos::Logos;
 use memchr::memchr_iter;

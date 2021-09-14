@@ -1,8 +1,7 @@
-#![cfg(feature = "fsm")]
-
 pub mod dot;
 pub mod local;
 pub mod petrify;
+pub mod subtype;
 
 pub use self::{dot::Dot, local::Local, petrify::Petrify};
 
@@ -269,6 +268,15 @@ impl<N, E> Default for Parameters<N, E> {
     }
 }
 
+impl<N, E> Parameters<N, E> {
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Parameters::Unnamed(parameters) => parameters.is_empty(),
+            Parameters::Named(parameters) => parameters.is_empty(),
+        }
+    }
+}
+
 impl<N: Display, E: Display> Display for Parameters<N, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fn fmt<T: Display>(values: &[T], f: &mut Formatter<'_>) -> fmt::Result {
@@ -313,7 +321,10 @@ impl<N, E> Message<N, E> {
 
 impl<N: Display, E: Display> Display for Message<N, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}({})", self.label, self.parameters)?;
+        write!(f, "{}", self.label)?;
+        if !self.parameters.is_empty() {
+            write!(f, "({})", self.parameters)?;
+        }
 
         let mut assignments = self.assignments.iter();
         if let Some((name, refinement)) = assignments.next() {

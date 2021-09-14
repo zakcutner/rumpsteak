@@ -1,10 +1,7 @@
 use argh::FromArgs;
-use rumpsteak::{
-    fsm::{
-        dot::{self, ParseErrors},
-        Fsm,
-    },
-    subtype,
+use rumpsteak_fsm::{
+    dot::{self, ParseErrors},
+    subtype, Fsm,
 };
 use std::{
     convert::Infallible,

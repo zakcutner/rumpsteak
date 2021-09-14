@@ -1,9 +1,7 @@
 #![cfg(feature = "serialize")]
 
-use crate::{
-    fsm::{Action, Fsm, Message, StateIndex, Transition},
-    Branch, End, FromState, Receive, Role, Select, Send,
-};
+use crate::{Branch, End, FromState, Receive, Role, Select, Send};
+use rumpsteak_fsm::{Action, Fsm, Message, StateIndex, Transition};
 use std::{
     any::{type_name, TypeId},
     collections::{hash_map::Entry, HashMap},

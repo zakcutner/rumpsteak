@@ -9,7 +9,7 @@ use self::{
     pair::Pair,
     prefix::{Index, Prefix, Snapshot},
 };
-use crate::fsm::{Action, Fsm, StateIndex, TransitionRef};
+use crate::{Action, Fsm, StateIndex, TransitionRef};
 use std::{convert::Infallible, iter::Peekable, mem};
 
 #[derive(Clone)]
