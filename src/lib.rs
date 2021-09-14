@@ -15,6 +15,14 @@ use thiserror::Error;
 pub type SendError<Q, R> = <<Q as Route<R>>::Route as Sink<<Q as Role>::Message>>::Error;
 
 #[derive(Debug, Error)]
+pub enum Error<E> {
+    #[error("failed to check refinements")]
+    Refinements,
+    #[error(transparent)]
+    Other(#[from] E),
+}
+
+#[derive(Debug, Error)]
 pub enum ReceiveError {
     #[error("receiver stream is empty")]
     EmptyStream,
@@ -68,21 +76,25 @@ pub trait Route<R>: Role + Sized {
     fn route(&mut self) -> &mut Self::Route;
 }
 
-pub struct State<'r, R: Role> {
+pub struct State<'r, R: Role, M = ()> {
     role: &'r mut R,
+    mapping: M,
 }
 
-impl<'r, R: Role> State<'r, R> {
+impl<'r, R: Role, M: Default> State<'r, R, M> {
     #[inline]
     fn new(role: &'r mut R) -> Self {
-        Self { role }
+        let mapping = Default::default();
+        Self { role, mapping }
     }
 }
 
 pub trait FromState<'r> {
     type Role: Role;
 
-    fn from_state(state: State<'r, Self::Role>) -> Self;
+    type Mapping;
+
+    fn from_state(state: State<'r, Self::Role, Self::Mapping>) -> Self;
 }
 
 pub trait Session<'r>: FromState<'r> + private::Session {}
@@ -93,33 +105,51 @@ pub trait IntoSession<'r>: FromState<'r> {
     fn into_session(self) -> Self::Session;
 }
 
-pub struct End<'r, R: Role> {
-    _state: State<'r, R>,
+pub trait Verify<M, L> {
+    fn verify(mapping: &mut M, label: &L) -> bool;
 }
 
-impl<'r, R: Role> FromState<'r> for End<'r, R> {
+pub struct Always;
+
+impl<M, L> Verify<M, L> for Always {
+    fn verify(_: &mut M, _: &L) -> bool {
+        true
+    }
+}
+
+pub struct End<'r, R: Role, M = ()> {
+    _state: State<'r, R, M>,
+}
+
+impl<'r, R: Role, M> FromState<'r> for End<'r, R, M> {
     type Role = R;
 
+    type Mapping = M;
+
     #[inline]
-    fn from_state(state: State<'r, Self::Role>) -> Self {
+    fn from_state(state: State<'r, Self::Role, M>) -> Self {
         Self { _state: state }
     }
 }
 
-impl<'r, R: Role> private::Session for End<'r, R> {}
+impl<'r, R: Role, M> private::Session for End<'r, R, M> {}
 
-impl<'r, R: Role> Session<'r> for End<'r, R> {}
+impl<'r, R: Role, M> Session<'r> for End<'r, R, M> {}
 
-pub struct Send<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> {
-    state: State<'q, Q>,
-    phantom: PhantomData<(R, L, S)>,
+pub struct Send<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, M = (), V = Always> {
+    state: State<'q, Q, M>,
+    phantom: PhantomData<(R, L, S, V)>,
 }
 
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> FromState<'q> for Send<'q, Q, R, L, S> {
+impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, M, V> FromState<'q>
+    for Send<'q, Q, R, L, S, M, V>
+{
     type Role = Q;
 
+    type Mapping = M;
+
     #[inline]
-    fn from_state(state: State<'q, Self::Role>) -> Self {
+    fn from_state(state: State<'q, Self::Role, M>) -> Self {
         Self {
             state,
             phantom: PhantomData,
@@ -127,32 +157,47 @@ impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> FromState<'q> for Send<'q, Q
     }
 }
 
-impl<'q, Q: Route<R>, R, L, S: FromState<'q, Role = Q>> Send<'q, Q, R, L, S>
+impl<'q, Q: Route<R>, R, L, S: FromState<'q, Role = Q, Mapping = M>, M, V: Verify<M, L>>
+    Send<'q, Q, R, L, S, M, V>
 where
     Q::Message: Message<L>,
     Q::Route: Sink<Q::Message> + Unpin,
 {
     #[inline]
-    pub async fn send(self, label: L) -> Result<S, SendError<Q, R>> {
+    pub async fn send(mut self, label: L) -> Result<S, Error<SendError<Q, R>>> {
+        if !V::verify(&mut self.state.mapping, &label) {
+            return Err(Error::Refinements);
+        }
+
         self.state.role.route().send(Message::upcast(label)).await?;
         Ok(FromState::from_state(self.state))
     }
 }
 
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> private::Session for Send<'q, Q, R, L, S> {}
-
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> Session<'q> for Send<'q, Q, R, L, S> {}
-
-pub struct Receive<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> {
-    state: State<'q, Q>,
-    phantom: PhantomData<(R, L, S)>,
+impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, M, V> private::Session
+    for Send<'q, Q, R, L, S, M, V>
+{
 }
 
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> FromState<'q> for Receive<'q, Q, R, L, S> {
+impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, M, V> Session<'q>
+    for Send<'q, Q, R, L, S, M, V>
+{
+}
+
+pub struct Receive<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, M = (), V = Always> {
+    state: State<'q, Q, M>,
+    phantom: PhantomData<(R, L, S, V)>,
+}
+
+impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, M, V> FromState<'q>
+    for Receive<'q, Q, R, L, S, M, V>
+{
     type Role = Q;
 
+    type Mapping = M;
+
     #[inline]
-    fn from_state(state: State<'q, Self::Role>) -> Self {
+    fn from_state(state: State<'q, Self::Role, M>) -> Self {
         Self {
             state,
             phantom: PhantomData,
@@ -160,38 +205,54 @@ impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> FromState<'q> for Receive<'q
     }
 }
 
-impl<'q, Q: Route<R>, R, L, S: FromState<'q, Role = Q>> Receive<'q, Q, R, L, S>
+impl<'q, Q: Route<R>, R, L, S: FromState<'q, Role = Q, Mapping = M>, M, V: Verify<M, L>>
+    Receive<'q, Q, R, L, S, M, V>
 where
     Q::Message: Message<L>,
     Q::Route: Stream<Item = Q::Message> + Unpin,
 {
     #[inline]
-    pub async fn receive(self) -> Result<(L, S), ReceiveError> {
+    pub async fn receive(mut self) -> Result<(L, S), Error<ReceiveError>> {
         let message = self.state.role.route().next().await;
         let message = message.ok_or(ReceiveError::EmptyStream)?;
+
         let label = message.downcast().or(Err(ReceiveError::UnexpectedType))?;
+        if !V::verify(&mut self.state.mapping, &label) {
+            return Err(Error::Refinements);
+        }
+
         Ok((label, FromState::from_state(self.state)))
     }
 }
 
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> private::Session for Receive<'q, Q, R, L, S> {}
-
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> Session<'q> for Receive<'q, Q, R, L, S> {}
-
-pub trait Choice<'r, L> {
-    type Session: FromState<'r>;
+impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, M, V> private::Session
+    for Receive<'q, Q, R, L, S, M, V>
+{
 }
 
-pub struct Select<'q, Q: Role, R, C> {
-    state: State<'q, Q>,
+impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, M, V> Session<'q>
+    for Receive<'q, Q, R, L, S, M, V>
+{
+}
+
+pub trait Choice<'r, M, L> {
+    type Session: FromState<'r>;
+
+    type Verify: Verify<M, L>;
+}
+
+pub struct Select<'q, Q: Role, R, C, M = ()> {
+    state: State<'q, Q, M>,
     phantom: PhantomData<(R, C)>,
 }
 
-impl<'q, Q: Role, R, C> FromState<'q> for Select<'q, Q, R, C> {
+impl<'q, Q: Role, R, C, M> FromState<'q> for Select<'q, Q, R, C, M> {
     type Role = Q;
 
+    type Mapping = M;
+
     #[inline]
-    fn from_state(state: State<'q, Self::Role>) -> Self {
+    fn from_state(state: State<'q, Self::Role, M>) -> Self {
         Self {
             state,
             phantom: PhantomData,
@@ -199,45 +260,56 @@ impl<'q, Q: Role, R, C> FromState<'q> for Select<'q, Q, R, C> {
     }
 }
 
-impl<'q, Q: Route<R>, R, C> Select<'q, Q, R, C>
+impl<'q, Q: Route<R>, R, C, M> Select<'q, Q, R, C, M>
 where
     Q::Route: Sink<Q::Message> + Unpin,
 {
     #[inline]
-    pub async fn select<L>(self, label: L) -> Result<<C as Choice<'q, L>>::Session, SendError<Q, R>>
+    pub async fn select<L>(
+        mut self,
+        label: L,
+    ) -> Result<<C as Choice<'q, M, L>>::Session, Error<SendError<Q, R>>>
     where
         Q::Message: Message<L>,
-        C: Choice<'q, L>,
-        C::Session: FromState<'q, Role = Q>,
+        C: Choice<'q, M, L>,
+        C::Session: FromState<'q, Role = Q, Mapping = M>,
     {
+        if !C::Verify::verify(&mut self.state.mapping, &label) {
+            return Err(Error::Refinements);
+        }
+
         self.state.role.route().send(Message::upcast(label)).await?;
         Ok(FromState::from_state(self.state))
     }
 }
 
-impl<'q, Q: Role, R, C> private::Session for Select<'q, Q, R, C> {}
+impl<'q, Q: Role, R, C, M> private::Session for Select<'q, Q, R, C, M> {}
 
-impl<'q, Q: Role, R, C> Session<'q> for Select<'q, Q, R, C> {}
+impl<'q, Q: Role, R, C, M> Session<'q> for Select<'q, Q, R, C, M> {}
 
 pub trait Choices<'r>: Sized {
     type Role: Role;
 
+    type Mapping;
+
     fn downcast(
-        state: State<'r, Self::Role>,
+        state: State<'r, Self::Role, Self::Mapping>,
         message: <Self::Role as Role>::Message,
     ) -> Result<Self, <Self::Role as Role>::Message>;
 }
 
-pub struct Branch<'q, Q: Role, R, C> {
-    state: State<'q, Q>,
-    phantom: PhantomData<(R, C)>,
+pub struct Branch<'q, Q: Role, R, C, M = (), V = Always> {
+    state: State<'q, Q, M>,
+    phantom: PhantomData<(R, C, V)>,
 }
 
-impl<'q, Q: Role, R, C> FromState<'q> for Branch<'q, Q, R, C> {
+impl<'q, Q: Role, R, C, M, V> FromState<'q> for Branch<'q, Q, R, C, M, V> {
     type Role = Q;
 
+    type Mapping = M;
+
     #[inline]
-    fn from_state(state: State<'q, Self::Role>) -> Self {
+    fn from_state(state: State<'q, Self::Role, M>) -> Self {
         Self {
             state,
             phantom: PhantomData,
@@ -245,22 +317,29 @@ impl<'q, Q: Role, R, C> FromState<'q> for Branch<'q, Q, R, C> {
     }
 }
 
-impl<'q, Q: Route<R>, R, C: Choices<'q, Role = Q>> Branch<'q, Q, R, C>
+impl<'q, Q: Route<R>, R, C: Choices<'q, Role = Q, Mapping = M>, M, V: Verify<M, C>>
+    Branch<'q, Q, R, C, M, V>
 where
     Q::Route: Stream<Item = Q::Message> + Unpin,
 {
     #[inline]
-    pub async fn branch(self) -> Result<C, ReceiveError> {
+    pub async fn branch(mut self) -> Result<C, Error<ReceiveError>> {
         let message = self.state.role.route().next().await;
         let message = message.ok_or(ReceiveError::EmptyStream)?;
+
         let choice = C::downcast(self.state, message);
-        choice.or(Err(ReceiveError::UnexpectedType))
+        let choice = choice.or(Err(ReceiveError::UnexpectedType))?;
+        // if !V::verify(&mut self.state.mapping, &choice) {
+        //     return Err(Error::Refinements);
+        // }
+
+        Ok(choice)
     }
 }
 
-impl<'q, Q: Role, R, C> private::Session for Branch<'q, Q, R, C> {}
+impl<'q, Q: Role, R, C, M, V> private::Session for Branch<'q, Q, R, C, M, V> {}
 
-impl<'q, Q: Role, R, C> Session<'q> for Branch<'q, Q, R, C> {}
+impl<'q, Q: Role, R, C, M, V> Session<'q> for Branch<'q, Q, R, C, M, V> {}
 
 #[inline]
 pub async fn session<'r, R: Role, S: FromState<'r, Role = R>, T, F>(
@@ -268,6 +347,7 @@ pub async fn session<'r, R: Role, S: FromState<'r, Role = R>, T, F>(
     f: impl FnOnce(S) -> F,
 ) -> T
 where
+    S::Mapping: Default,
     F: Future<Output = (T, End<'r, R>)>,
 {
     let output = try_session(role, |s| f(s).map(Ok)).await;
@@ -280,6 +360,7 @@ pub async fn try_session<'r, R: Role, S: FromState<'r, Role = R>, T, E, F>(
     f: impl FnOnce(S) -> F,
 ) -> Result<T, E>
 where
+    S::Mapping: Default,
     F: Future<Output = Result<(T, End<'r, R>), E>>,
 {
     let session = FromState::from_state(State::new(role));
