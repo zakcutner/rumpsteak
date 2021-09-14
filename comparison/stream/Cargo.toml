@@ -22,8 +22,8 @@ harness = false
 crossbeam-channel = "0.5"
 ferrite-session = "0.2"
 futures = "0.3"
-mpst-seq = "0.0"
-mpstthree = "0.0"
+mpst-seq = "0.0.7"
+mpstthree = "0.0.9"
 rumpsteak = { path = "../.." }
 rumpsteak-oneshot = { path = "../../oneshot" }
 sesh = "0.1.1"
