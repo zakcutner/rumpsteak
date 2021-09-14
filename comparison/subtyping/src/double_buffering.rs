@@ -1,12 +1,14 @@
 #![allow(clippy::nonstandard_macro_braces)]
 
 use argh::FromArgs;
-use rumpsteak::fsm::{self, Action, Dot, Normalizer, Petrify, Transition, TransitionError};
-use std::{error::Error, result, str::FromStr};
+use rumpsteak::fsm::{
+    self, Action, AddTransitionError, Dot, Message, Normalizer, Petrify, Transition,
+};
+use std::{convert::Infallible, error::Error, result, str::FromStr};
 
-type Fsm = fsm::Fsm<&'static str, &'static str>;
+type Fsm = fsm::Fsm<&'static str, &'static str, Infallible>;
 
-type Result<T, E = TransitionError> = result::Result<T, E>;
+type Result<T, E = AddTransitionError> = result::Result<T, E>;
 
 struct Roles(usize);
 
@@ -58,8 +60,11 @@ fn source() -> Result<Fsm> {
     let s0 = fsm.add_state();
     let s1 = fsm.add_state();
 
-    fsm.add_transition(s0, s1, Transition::new("K", Action::Input, "ready"))?;
-    fsm.add_transition(s1, s0, Transition::new("K", Action::Output, "value"))?;
+    let transition = Transition::new("K", Action::Input, Message::from_label("ready"));
+    fsm.add_transition(s0, s1, transition)?;
+
+    let transition = Transition::new("K", Action::Output, Message::from_label("value"));
+    fsm.add_transition(s1, s0, transition)?;
 
     Ok(fsm)
 }
@@ -70,7 +75,8 @@ fn kernel(unrolls: usize) -> Result<Fsm> {
 
     for _ in 0..unrolls {
         let s1 = fsm.add_state();
-        fsm.add_transition(s0, s1, Transition::new("S", Action::Output, "ready"))?;
+        let transition = Transition::new("S", Action::Output, Message::from_label("ready"));
+        fsm.add_transition(s0, s1, transition)?;
         s0 = s1;
     }
 
@@ -78,10 +84,17 @@ fn kernel(unrolls: usize) -> Result<Fsm> {
     let s2 = fsm.add_state();
     let s3 = fsm.add_state();
 
-    fsm.add_transition(s0, s1, Transition::new("S", Action::Output, "ready"))?;
-    fsm.add_transition(s1, s2, Transition::new("S", Action::Input, "value"))?;
-    fsm.add_transition(s2, s3, Transition::new("T", Action::Input, "ready"))?;
-    fsm.add_transition(s3, s0, Transition::new("T", Action::Output, "value"))?;
+    let transition = Transition::new("S", Action::Output, Message::from_label("ready"));
+    fsm.add_transition(s0, s1, transition)?;
+
+    let transition = Transition::new("S", Action::Input, Message::from_label("value"));
+    fsm.add_transition(s1, s2, transition)?;
+
+    let transition = Transition::new("T", Action::Input, Message::from_label("ready"));
+    fsm.add_transition(s2, s3, transition)?;
+
+    let transition = Transition::new("T", Action::Output, Message::from_label("value"));
+    fsm.add_transition(s3, s0, transition)?;
 
     Ok(fsm)
 }
@@ -92,8 +105,11 @@ fn sink() -> Result<Fsm> {
     let s0 = fsm.add_state();
     let s1 = fsm.add_state();
 
-    fsm.add_transition(s0, s1, Transition::new("K", Action::Output, "ready"))?;
-    fsm.add_transition(s1, s0, Transition::new("K", Action::Input, "value"))?;
+    let transition = Transition::new("K", Action::Output, Message::from_label("ready"));
+    fsm.add_transition(s0, s1, transition)?;
+
+    let transition = Transition::new("K", Action::Input, Message::from_label("value"));
+    fsm.add_transition(s1, s0, transition)?;
 
     Ok(fsm)
 }

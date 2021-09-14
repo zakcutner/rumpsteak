@@ -15,7 +15,7 @@ name = "rumpsteak-generate"
 required-features = ["clap"]
 
 [dependencies]
-askama = { git = "https://github.com/djc/askama", rev = "95e346e" }
+askama = { git = "https://github.com/djc/askama", rev = "b93ce46" }
 clap = { version = "3.0.0-beta", optional = true }
 heck = "0.3"
 indexmap = "1.6"

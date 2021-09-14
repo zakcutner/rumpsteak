@@ -2,13 +2,14 @@
 
 use argh::FromArgs;
 use rumpsteak::fsm::{
-    self, Action, Dot, Local, Normalizer, Petrify, StateIndex, Transition, TransitionError,
+    self, Action, AddTransitionError, Dot, Local, Message, Normalizer, Petrify, StateIndex,
+    Transition,
 };
-use std::{result, str::FromStr};
+use std::{convert::Infallible, result, str::FromStr};
 
-type Fsm = fsm::Fsm<&'static str, &'static str>;
+type Fsm = fsm::Fsm<&'static str, &'static str, Infallible>;
 
-type Result<T, E = TransitionError> = result::Result<T, E>;
+type Result<T, E = AddTransitionError> = result::Result<T, E>;
 
 type Generate = fn(&mut Fsm, usize) -> Result<StateIndex>;
 
@@ -61,13 +62,26 @@ fn subtype(fsm: &mut Fsm, levels: usize) -> Result<StateIndex> {
     let s6 = subtype(fsm, levels - 1)?;
     let s7 = subtype(fsm, levels - 1)?;
 
-    fsm.add_transition(s0, s1, Transition::new("B", Action::Output, "m"))?;
-    fsm.add_transition(s0, s2, Transition::new("B", Action::Output, "p"))?;
-    fsm.add_transition(s1, s3, Transition::new("B", Action::Input, "r"))?;
-    fsm.add_transition(s1, s4, Transition::new("B", Action::Input, "s"))?;
-    fsm.add_transition(s1, s5, Transition::new("B", Action::Input, "u"))?;
-    fsm.add_transition(s2, s6, Transition::new("B", Action::Input, "r"))?;
-    fsm.add_transition(s2, s7, Transition::new("B", Action::Input, "s"))?;
+    let transition = Transition::new("B", Action::Output, Message::from_label("m"));
+    fsm.add_transition(s0, s1, transition)?;
+
+    let transition = Transition::new("B", Action::Output, Message::from_label("p"));
+    fsm.add_transition(s0, s2, transition)?;
+
+    let transition = Transition::new("B", Action::Input, Message::from_label("r"));
+    fsm.add_transition(s1, s3, transition)?;
+
+    let transition = Transition::new("B", Action::Input, Message::from_label("s"));
+    fsm.add_transition(s1, s4, transition)?;
+
+    let transition = Transition::new("B", Action::Input, Message::from_label("u"));
+    fsm.add_transition(s1, s5, transition)?;
+
+    let transition = Transition::new("B", Action::Input, Message::from_label("r"));
+    fsm.add_transition(s2, s6, transition)?;
+
+    let transition = Transition::new("B", Action::Input, Message::from_label("s"));
+    fsm.add_transition(s2, s7, transition)?;
 
     Ok(s0)
 }
@@ -86,13 +100,26 @@ fn supertype(fsm: &mut Fsm, levels: usize) -> Result<StateIndex> {
     let s6 = subtype(fsm, levels - 1)?;
     let s7 = subtype(fsm, levels - 1)?;
 
-    fsm.add_transition(s0, s1, Transition::new("B", Action::Input, "r"))?;
-    fsm.add_transition(s0, s2, Transition::new("B", Action::Input, "s"))?;
-    fsm.add_transition(s1, s3, Transition::new("B", Action::Output, "m"))?;
-    fsm.add_transition(s1, s4, Transition::new("B", Action::Output, "p"))?;
-    fsm.add_transition(s1, s5, Transition::new("B", Action::Output, "q"))?;
-    fsm.add_transition(s2, s6, Transition::new("B", Action::Output, "m"))?;
-    fsm.add_transition(s2, s7, Transition::new("B", Action::Output, "p"))?;
+    let transition = Transition::new("B", Action::Input, Message::from_label("r"));
+    fsm.add_transition(s0, s1, transition)?;
+
+    let transition = Transition::new("B", Action::Input, Message::from_label("s"));
+    fsm.add_transition(s0, s2, transition)?;
+
+    let transition = Transition::new("B", Action::Output, Message::from_label("m"));
+    fsm.add_transition(s1, s3, transition)?;
+
+    let transition = Transition::new("B", Action::Output, Message::from_label("p"));
+    fsm.add_transition(s1, s4, transition)?;
+
+    let transition = Transition::new("B", Action::Output, Message::from_label("q"));
+    fsm.add_transition(s1, s5, transition)?;
+
+    let transition = Transition::new("B", Action::Output, Message::from_label("m"));
+    fsm.add_transition(s2, s6, transition)?;
+
+    let transition = Transition::new("B", Action::Output, Message::from_label("p"));
+    fsm.add_transition(s2, s7, transition)?;
 
     Ok(s0)
 }

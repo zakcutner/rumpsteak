@@ -1,12 +1,12 @@
 #![allow(clippy::nonstandard_macro_braces)]
 
 use argh::FromArgs;
-use rumpsteak::fsm::{self, Action, Dot, Petrify, Transition, TransitionError};
-use std::{error::Error, iter, result, str::FromStr};
+use rumpsteak::fsm::{self, Action, AddTransitionError, Dot, Message, Petrify, Transition};
+use std::{convert::Infallible, error::Error, iter, result, str::FromStr};
 
-type Fsm = fsm::Fsm<usize, usize>;
+type Fsm = fsm::Fsm<usize, usize, Infallible>;
 
-type Result<T, E = TransitionError> = result::Result<T, E>;
+type Result<T, E = AddTransitionError> = result::Result<T, E>;
 
 struct Roles(usize);
 
@@ -62,8 +62,11 @@ fn unoptimized(n: usize, before: usize, after: usize) -> Result<Fsm> {
     let s0 = fsm.add_state();
     let s1 = fsm.add_state();
 
-    fsm.add_transition(s0, s1, Transition::new(before, Action::Input, 0))?;
-    fsm.add_transition(s1, s0, Transition::new(after, Action::Output, 0))?;
+    let transition = Transition::new(before, Action::Input, Message::from_label(0));
+    fsm.add_transition(s0, s1, transition)?;
+
+    let transition = Transition::new(after, Action::Output, Message::from_label(0));
+    fsm.add_transition(s1, s0, transition)?;
 
     Ok(fsm)
 }
@@ -74,8 +77,11 @@ fn optimized(n: usize, before: usize, after: usize) -> Result<Fsm> {
     let s0 = fsm.add_state();
     let s1 = fsm.add_state();
 
-    fsm.add_transition(s0, s1, Transition::new(after, Action::Output, 0))?;
-    fsm.add_transition(s1, s0, Transition::new(before, Action::Input, 0))?;
+    let transition = Transition::new(after, Action::Output, Message::from_label(0));
+    fsm.add_transition(s0, s1, transition)?;
+
+    let transition = Transition::new(before, Action::Input, Message::from_label(0));
+    fsm.add_transition(s1, s0, transition)?;
 
     Ok(fsm)
 }

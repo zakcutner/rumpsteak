@@ -1,12 +1,13 @@
 #![cfg(feature = "serialize")]
 
 use crate::{
-    fsm::{Action, Fsm, StateIndex, Transition},
+    fsm::{Action, Fsm, Message, StateIndex, Transition},
     Branch, End, FromState, Receive, Role, Select, Send,
 };
 use std::{
     any::{type_name, TypeId},
     collections::{hash_map::Entry, HashMap},
+    convert::Infallible,
     fmt::{self, Display, Formatter},
     hash::{Hash, Hasher},
 };
@@ -45,9 +46,9 @@ impl Hash for Type {
 }
 
 pub struct Serializer {
-    fsm: Fsm<Type, Type>,
+    fsm: Fsm<Type, Type, Infallible>,
     history: HashMap<TypeId, StateIndex>,
-    previous: Option<(StateIndex, Transition<Type, Type>)>,
+    previous: Option<(StateIndex, Transition<Type, Type, Infallible>)>,
 }
 
 impl Serializer {
@@ -101,7 +102,8 @@ pub struct ChoicesSerializer<'a> {
 
 impl ChoicesSerializer<'_> {
     pub fn serialize_choice<L: 'static, S: Serialize>(&mut self) {
-        let transition = Transition::new(self.role, self.action, Type::new::<L>());
+        let message = Message::from_label(Type::new::<L>());
+        let transition = Transition::new(self.role, self.action, message);
         self.serializer.previous = Some((self.state, transition));
         S::serialize(&mut self.serializer);
     }
@@ -159,7 +161,7 @@ impl<Q: Role + 'static, R: 'static, C: SerializeChoices> Serialize for Branch<'s
     }
 }
 
-pub fn serialize<S: FromState<'static> + Serialize>() -> Fsm<Type, Type> {
+pub fn serialize<S: FromState<'static> + Serialize>() -> Fsm<Type, Type, Infallible> {
     let mut serializer = Serializer {
         fsm: Fsm::new(Type::new::<S::Role>()),
         history: HashMap::new(),

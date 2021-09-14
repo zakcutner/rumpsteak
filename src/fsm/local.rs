@@ -1,15 +1,15 @@
 use super::{Fsm, StateIndex, Transition};
 use std::fmt::{self, Display, Formatter};
 
-pub enum Local<R, L> {
+pub enum Local<R, N, E> {
     End,
     Recursion(usize),
     Variable(usize, Box<Self>),
-    Transitions(Vec<(Transition<R, L>, Box<Self>)>),
+    Transitions(Vec<(Transition<R, N, E>, Box<Self>)>),
 }
 
-impl<R: Clone, L: Clone> Local<R, L> {
-    pub fn new(fsm: &Fsm<R, L>) -> Self {
+impl<R: Clone, N: Clone, E: Clone> Local<R, N, E> {
+    pub fn new(fsm: &Fsm<R, N, E>) -> Self {
         let size = fsm.size().0;
         assert!(size > 0);
 
@@ -24,14 +24,14 @@ impl<R: Clone, L: Clone> Local<R, L> {
     }
 }
 
-struct Builder<'a, R, L> {
-    fsm: &'a Fsm<R, L>,
+struct Builder<'a, R, N, E> {
+    fsm: &'a Fsm<R, N, E>,
     seen: &'a mut Vec<bool>,
     looped: &'a mut Vec<Option<usize>>,
     variables: &'a mut usize,
 }
 
-impl<'a, R: Clone, L: Clone> Builder<'a, R, L> {
+impl<'a, R: Clone, N: Clone, E: Clone> Builder<'a, R, N, E> {
     fn variable(&mut self, state: StateIndex) -> usize {
         let variable = &mut self.looped[state.index()];
         match variable {
@@ -45,7 +45,7 @@ impl<'a, R: Clone, L: Clone> Builder<'a, R, L> {
         }
     }
 
-    fn build(&mut self, state: StateIndex) -> Local<R, L> {
+    fn build(&mut self, state: StateIndex) -> Local<R, N, E> {
         if self.seen[state.index()] {
             return Local::Recursion(self.variable(state));
         }
@@ -56,8 +56,8 @@ impl<'a, R: Clone, L: Clone> Builder<'a, R, L> {
         }
 
         self.seen[state.index()] = true;
-        let transitions = transitions
-            .map(|(to, transition)| (Transition::to_owned(&transition), Box::new(self.build(to))));
+        let transitions =
+            transitions.map(|(to, transition)| (transition.to_owned(), Box::new(self.build(to))));
         let ty = Local::Transitions(transitions.collect());
         self.seen[state.index()] = false;
 
@@ -69,7 +69,7 @@ impl<'a, R: Clone, L: Clone> Builder<'a, R, L> {
     }
 }
 
-impl<R: Display, L: Display> Display for Local<R, L> {
+impl<R: Display, N: Display, E: Display> Display for Local<R, N, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::End => write!(f, "end"),

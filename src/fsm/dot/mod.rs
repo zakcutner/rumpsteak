@@ -1,20 +1,20 @@
 mod parse;
 
 #[cfg(feature = "parsing")]
-pub use self::parse::{parse, ParseError, ParseIter};
+pub use self::parse::{parse, parse_with_refinements, ParseErrors};
 
 use super::Fsm;
 use std::fmt::{self, Display, Formatter};
 
-pub struct Dot<'a, R, L>(&'a Fsm<R, L>);
+pub struct Dot<'a, R, N, E>(&'a Fsm<R, N, E>);
 
-impl<'a, R, L> Dot<'a, R, L> {
-    pub fn new(fsm: &'a Fsm<R, L>) -> Self {
+impl<'a, R, N, E> Dot<'a, R, N, E> {
+    pub fn new(fsm: &'a Fsm<R, N, E>) -> Self {
         Self(fsm)
     }
 }
 
-impl<'a, R: Display, L: Display> Display for Dot<'a, R, L> {
+impl<'a, R: Display, N: Display, E: Display> Display for Dot<'a, R, N, E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "digraph \"{}\" {{", self.0.role())?;
         let (states, transitions) = self.0.size();
