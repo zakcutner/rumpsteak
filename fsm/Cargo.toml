@@ -18,7 +18,7 @@ required-features = ["argh", "atty", "parsing", "subtyping", "termcolor"]
 [dependencies]
 argh = { version = "0.1", optional = true }
 atty = { version = "0.2", optional = true }
-bitvec = { version = "0.22", optional = true }
+bitvec = { version = "0.20", optional = true }
 codespan-reporting = { version = "0.11", optional = true }
 logos = { version = "0.12", optional = true }
 memchr = { version = "2.4", optional = true }

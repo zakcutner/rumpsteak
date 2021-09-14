@@ -7,7 +7,7 @@ use crate::{cache::Cache, client::Client, origin::Origin, proxy::Proxy};
 use argh::FromArgs;
 use fred::{
     client::RedisClient,
-    types::{ReconnectPolicy, RedisConfig},
+    types::{ReconnectPolicy, RedisConfig, ServerConfig},
 };
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
@@ -183,12 +183,14 @@ async fn try_main() -> Result<()> {
     options.header.sort_unstable();
     options.header.dedup();
 
-    let redis = RedisClient::new(RedisConfig::new_centralized(
-        options.redis.host(),
-        options.redis.port_u16().unwrap_or(6379),
-        None,
-    ));
-    let handle = redis.connect(Some(ReconnectPolicy::new_constant(0, 0)), true);
+    let redis = RedisClient::new(RedisConfig {
+        server: ServerConfig::new_centralized(
+            options.redis.host(),
+            options.redis.port_u16().unwrap_or(6379),
+        ),
+        ..Default::default()
+    });
+    let handle = redis.connect(Some(ReconnectPolicy::new_constant(0, 0)));
     wrap(redis.wait_for_connect().await)?;
 
     let context = Arc::new(Context {
