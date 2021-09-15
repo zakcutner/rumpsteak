@@ -51,8 +51,8 @@ done
 
 hyperfine -w 5 --parameter-scan n 0 100 -D 10 --export-csv data/stream/results.csv 'subtype --visits 2 data/stream/rumpsteak/{n}.txt data/stream/rumpsteak/0.txt' 'kmc --fsm data/stream/kmc/{n}.txt 1 50' 'concur19 -T data/stream/concur19/{n}.txt data/stream/concur19/0.txt'
 
-hyperfine -w 5 --parameter-scan n 1 5 --export-csv data/nested_choice/results.csv 'subtype --visits 1 data/nested_choice/rumpsteak/subtype/{n}.txt data/nested_choice/rumpsteak/supertype/{n}.txt' 'kmc --fsm ./kmc/{n}.txt 1 1' 'concur19 -T data/nested_choice/concur19/subtype/{n}.txt data/nested_choice/concur19/supertype/{n}.txt'
+hyperfine -w 5 --parameter-scan n 1 5 --export-csv data/nested_choice/results.csv 'subtype --visits 1 data/nested_choice/rumpsteak/subtype/{n}.txt data/nested_choice/rumpsteak/supertype/{n}.txt' 'kmc --fsm data/nested_choice/kmc/{n}.txt 1 1' 'concur19 -T data/nested_choice/concur19/subtype/{n}.txt data/nested_choice/concur19/supertype/{n}.txt'
 
-hyperfine -w 5 --parameter-scan n 2 30 -D 2 --export-csv data/ring/results.csv 'subtype --visits 2 data/ring/rumpsteak/subtype/{n}.txt ./rumpsteak/supertype/{n}.txt' 'kmc --fsm data/ring/kmc/{n}.txt 1 1'
+hyperfine -w 5 --parameter-scan n 2 30 -D 2 --export-csv data/ring/results.csv 'subtype --visits 2 data/ring/rumpsteak/subtype/{n}.txt data/ring/rumpsteak/supertype/{n}.txt' 'kmc --fsm data/ring/kmc/{n}.txt 1 1'
 
 hyperfine -w 5 --parameter-scan n 0 100 -D 5 --export-csv data/double_buffering/results.csv 'subtype --visits 76 data/double_buffering/rumpsteak/{n}.txt data/double_buffering/rumpsteak/0.txt' 'kmc --fsm data/double_buffering/kmc/{n}.txt 1 50'
