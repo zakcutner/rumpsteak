@@ -7,4 +7,7 @@ cd examples/Running\ examples/ && \
 cd "$INIT_PWD"
 
 cd comparison && ./commands.sh
+cd "$INIT_PWD"
 
+cd comparison && cargo bench
+cd "$INIT_PWD"
