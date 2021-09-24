@@ -22,9 +22,16 @@ pub enum ReceiveError {
     UnexpectedType,
 }
 
+/// This trait represents a message to be exchanged between two participants.
+/// The generic type L is the type of the label (i.e. the content of the
+/// message).
 pub trait Message<L>: Sized {
+    /// Creates a message from a label.
     fn upcast(label: L) -> Self;
 
+    /// Tries to get the label contained in the `Message`. This might fail,
+    /// typically if we are trying to get a label of the wrong type. In case of
+    /// failure, the result contains `self`, hence the message is not lost.
     fn downcast(self) -> Result<L, Self>;
 }
 
@@ -68,6 +75,11 @@ pub trait Route<R>: Role + Sized {
     fn route(&mut self) -> &mut Self::Route;
 }
 
+/// This structure is mainly a placeholder for a `Role` and for types.
+/// Typically, each each state (in the sense of automata state) of the protocol,
+/// e.g. a `Send`, a `Receive`, etc, contains a `State`, as well as some type
+/// bounds. When an action is taken (e.g. when `send` is called on a `Send`),
+/// the `Send` will take it state and convert it into the continuation.
 pub struct State<'r, R: Role> {
     role: &'r mut R,
 }
@@ -93,6 +105,7 @@ pub trait IntoSession<'r>: FromState<'r> {
     fn into_session(self) -> Self::Session;
 }
 
+/// This structure represents a terminated protocol.
 pub struct End<'r, R: Role> {
     _state: State<'r, R>,
 }
@@ -110,6 +123,7 @@ impl<'r, R: Role> private::Session for End<'r, R> {}
 
 impl<'r, R: Role> Session<'r> for End<'r, R> {}
 
+/// This structure represents a protocol which next action is to send.
 pub struct Send<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> {
     state: State<'q, Q>,
     phantom: PhantomData<(R, L, S)>,
@@ -143,6 +157,7 @@ impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> private::Session for Send<'q
 
 impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> Session<'q> for Send<'q, Q, R, L, S> {}
 
+/// This structure represents a protocol which next action is to receive .
 pub struct Receive<'q, Q: Role, R, L, S: FromState<'q, Role = Q>> {
     state: State<'q, Q>,
     phantom: PhantomData<(R, L, S)>,
