@@ -151,7 +151,7 @@ impl<N, V> SideEffect for Constant<N, V> {
 /// the `Send` will take it state and convert it into the continuation.
 ///
 /// The generic `N` is the type of variable names and `V` the type of variable values.
-pub struct State<'r, R: Role, N, V, P = Tautology<N, V>, S = Constant<N, V>>
+pub struct State<'r, R: Role, N = (), V = (), P = Tautology<N, V>, S = Constant<N, V>>
 where
     P: Predicate<Name = N, Value = V>,
     S: SideEffect<Name = N, Value = V>,
@@ -191,7 +191,7 @@ pub trait IntoSession<'r>: FromState<'r> {
 }
 
 /// This structure represents a terminated protocol.
-pub struct End<'r, R: Role, N, V> {
+pub struct End<'r, R: Role, N = (), V = ()> {
     _state: State<'r, R, N, V>,
 }
 
@@ -211,7 +211,7 @@ impl<'r, R: Role, N, V> private::Session for End<'r, R, N, V> {}
 impl<'r, R: Role, N, V> Session<'r> for End<'r, R, N, V> {}
 
 /// This structure represents a protocol which next action is to send.
-pub struct Send<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V> {
+pub struct Send<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N = (), V = ()> {
     state: State<'q, Q, N, V>,
     phantom: PhantomData<(R, L, S)>,
 }
@@ -247,7 +247,7 @@ impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V> p
 impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V> Session<'q> for Send<'q, Q, R, L, S, N, V> {}
 
 /// This structure represents a protocol which next action is to receive .
-pub struct Receive<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, N, V> {
+pub struct Receive<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, N = (), V = ()> {
     state: State<'q, Q, N, V>,
     phantom: PhantomData<(R, L, S)>,
 }
@@ -288,7 +288,7 @@ pub trait Choice<'r, L> {
     type Session: FromState<'r>;
 }
 
-pub struct Select<'q, Q: Role, R, C, N, V> {
+pub struct Select<'q, Q: Role, R, C, N = (), V = ()> {
     state: State<'q, Q, N, V>,
     phantom: PhantomData<(R, C)>,
 }
@@ -338,7 +338,7 @@ pub trait Choices<'r>: Sized {
     ) -> Result<Self, <Self::Role as Role>::Message>;
 }
 
-pub struct Branch<'q, Q: Role, R, C, N, V> {
+pub struct Branch<'q, Q: Role, R, C, N = (), V = ()> {
     state: State<'q, Q, N, V>,
     phantom: PhantomData<(R, C)>,
 }
