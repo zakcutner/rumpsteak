@@ -32,7 +32,7 @@ fn unroll_type(mut ty: &mut Type) -> &mut Type {
     ty
 }
 
-fn augment_type(mut ty: &mut Type, exclude: &HashSet<Ident>) {
+fn augment_type(mut ty: &mut Type, name: &Type, value: &Type, exclude: &HashSet<Ident>) {
     while let Type::Path(path) = unroll_type(ty) {
         if *path == parse_quote!(Self) {
             break;
@@ -57,7 +57,7 @@ fn augment_type(mut ty: &mut Type, exclude: &HashSet<Ident>) {
         };
 
         let is_empty = args.is_empty();
-        punctuated_prepend(args, parse_quote!('__r, __R));
+        punctuated_prepend(args, parse_quote!('__r, __R, __N, __V));
 
         if is_empty {
             break;
@@ -70,17 +70,17 @@ fn augment_type(mut ty: &mut Type, exclude: &HashSet<Ident>) {
     }
 }
 
-fn session_type(mut input: ItemType) -> TokenStream {
+fn session_type(mut input: ItemType, name: Type, value: Type) -> TokenStream {
     let exclude = idents_set(&input.generics.params);
     punctuated_prepend(
         &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak::Role),
+        parse_quote!('__r, __R: ::rumpsteak::Role, __N, __V),
     );
-    augment_type(&mut input.ty, &exclude);
+    augment_type(&mut input.ty, &name, &value, &exclude);
     input.into_token_stream()
 }
 
-fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
+fn session_struct(mut input: ItemStruct, name: Type, value: Type) -> Result<TokenStream> {
     let ident = &input.ident;
     let exclude = idents_set(&input.generics.params);
 
@@ -96,7 +96,7 @@ fn session_struct(mut input: ItemStruct) -> Result<TokenStream> {
     }
 
     let field = input.fields.iter_mut().next().unwrap();
-    augment_type(&mut field.ty, &exclude);
+    augment_type(&mut field.ty, &name, &value, &exclude);
 
     let field_ty = &field.ty;
     let field_ident = match &field.ident {
@@ -152,14 +152,14 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type) -> Result<TokenStr
     let mut generics = input.generics.clone();
     punctuated_prepend(
         &mut generics.params,
-        parse_quote!('__q, '__r, __R: ::rumpsteak::Role + '__r),
+        parse_quote!('__q, '__r, __R: ::rumpsteak::Role + '__r, __N, __V),
     );
     let (impl_generics, _, _) = generics.split_for_impl();
 
     let mut generics = input.generics.clone();
     punctuated_prepend(
         &mut generics.params,
-        parse_quote!('__q, __R: ::rumpsteak::Role),
+        parse_quote!('__q, __R: ::rumpsteak::Role, __N, __V),
     );
     let (_, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -185,7 +185,7 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type) -> Result<TokenStr
         labels.push(label);
 
         let ty = &mut fields.next().unwrap().ty;
-        augment_type(ty, &exclude);
+        augment_type(ty, &name, &value, &exclude);
         tys.push(&*ty);
     }
 
@@ -200,7 +200,7 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type) -> Result<TokenStr
 
     punctuated_prepend(
         &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak::Role),
+        parse_quote!('__r, __R: ::rumpsteak::Role, __N, __V),
     );
     let (impl_generics, ty_generics, _) = input.generics.split_for_impl();
 
@@ -227,8 +227,8 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type) -> Result<TokenStr
     output.extend(quote! {
         impl #impl_generics ::rumpsteak::Choices<'__r> for #ident #ty_generics #where_clause {
             type Role = __R;
-            type Name = #name;
-            type Value = #value;
+            type Name = __N;
+            type Value = __V;
 
             fn downcast(
                 state: ::rumpsteak::State<'__r, Self::Role, Self::Name, Self::Value>,
@@ -267,12 +267,12 @@ pub fn session(attr: TokenStream, input: TokenStream) -> Result<TokenStream> {
     let input = parse2::<Item>(input)?;
     match input {
         Item::Type(input) => {
-            let Nothing = parse2(attr)?;
-            Ok(session_type(input))
+            let SessionParams(name, value) = parse2(attr)?;
+            Ok(session_type(input, name, value))
         },
         Item::Struct(input) => {
-            let Nothing = parse2(attr)?;
-            session_struct(input)
+            let SessionParams(name, value) = parse2(attr)?;
+            session_struct(input, name, value)
         },
         Item::Enum(input) => {
             let SessionParams(name, value) = parse2(attr)?;
