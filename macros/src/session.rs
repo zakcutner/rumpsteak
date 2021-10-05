@@ -1,11 +1,21 @@
 use proc_macro2::TokenStream;
+use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use std::{collections::HashSet, mem};
 use syn::{
-    parse::Nothing, parse2, parse_quote, punctuated::Punctuated, Error, Fields, GenericArgument,
+    parse2, parse_quote, punctuated::Punctuated, Error, Fields, GenericArgument,
     GenericParam, Ident, Index, Item, ItemEnum, ItemStruct, ItemType, PathArguments, Result, Type,
     parse::ParseStream, parse::Parse, Token,
 };
+
+static STATES: [&str; 5] =
+[
+    "End",
+    "Send",
+    "Receive",
+    "Branch",
+    "Select",
+];
 
 fn idents_set<P>(params: &Punctuated<GenericParam, P>) -> HashSet<Ident> {
     let idents = params.iter().filter_map(|param| match param {
@@ -32,7 +42,7 @@ fn unroll_type(mut ty: &mut Type) -> &mut Type {
     ty
 }
 
-fn augment_type(mut ty: &mut Type, name: &Type, value: &Type, exclude: &HashSet<Ident>) {
+fn augment_type(mut ty: &mut Type, name: &Type, value: &Type, predicate: &Type, effect: &Type, exclude: &HashSet<Ident>) {
     while let Type::Path(path) = unroll_type(ty) {
         if *path == parse_quote!(Self) {
             break;
@@ -57,7 +67,11 @@ fn augment_type(mut ty: &mut Type, name: &Type, value: &Type, exclude: &HashSet<
         };
 
         let is_empty = args.is_empty();
-        punctuated_prepend(args, parse_quote!('__r, __R, __N, __V));
+        if STATES.contains(&&*segment.ident.to_string()) {
+            punctuated_prepend(args, parse_quote!('__r, __R, #name, #value, #predicate, #effect));
+        } else {
+            punctuated_prepend(args, parse_quote!('__r, __R));
+        }
 
         if is_empty {
             break;
@@ -70,17 +84,17 @@ fn augment_type(mut ty: &mut Type, name: &Type, value: &Type, exclude: &HashSet<
     }
 }
 
-fn session_type(mut input: ItemType, name: Type, value: Type) -> TokenStream {
+fn session_type(mut input: ItemType, name: Type, value: Type, predicate: Type, effect: Type) -> TokenStream {
     let exclude = idents_set(&input.generics.params);
     punctuated_prepend(
         &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak::Role, __N, __V),
+        parse_quote!('__r, __R: ::rumpsteak::Role),
     );
-    augment_type(&mut input.ty, &name, &value, &exclude);
+    augment_type(&mut input.ty, &name, &value, &predicate, &effect, &exclude);
     input.into_token_stream()
 }
 
-fn session_struct(mut input: ItemStruct, name: Type, value: Type) -> Result<TokenStream> {
+fn session_struct(mut input: ItemStruct, name: Type, value: Type, predicate: Type, effect: Type) -> Result<TokenStream> {
     let ident = &input.ident;
     let exclude = idents_set(&input.generics.params);
 
@@ -96,7 +110,7 @@ fn session_struct(mut input: ItemStruct, name: Type, value: Type) -> Result<Toke
     }
 
     let field = input.fields.iter_mut().next().unwrap();
-    augment_type(&mut field.ty, &name, &value, &exclude);
+    augment_type(&mut field.ty, &name, &value, &predicate, &effect, &exclude);
 
     let field_ty = &field.ty;
     let field_ident = match &field.ident {
@@ -140,7 +154,7 @@ fn session_struct(mut input: ItemStruct, name: Type, value: Type) -> Result<Toke
     Ok(quote!(#input #output))
 }
 
-fn session_enum(mut input: ItemEnum, name: Type, value: Type) -> Result<TokenStream> {
+fn session_enum(mut input: ItemEnum, name: Type, value: Type, predicate: Type, effect: Type) -> Result<TokenStream> {
     if input.variants.is_empty() {
         let message = "expected at least one variant";
         return Err(Error::new_spanned(&input.variants, message));
@@ -152,14 +166,14 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type) -> Result<TokenStr
     let mut generics = input.generics.clone();
     punctuated_prepend(
         &mut generics.params,
-        parse_quote!('__q, '__r, __R: ::rumpsteak::Role + '__r, __N, __V),
+        parse_quote!('__q, '__r, __R: ::rumpsteak::Role + '__r),
     );
     let (impl_generics, _, _) = generics.split_for_impl();
 
     let mut generics = input.generics.clone();
     punctuated_prepend(
         &mut generics.params,
-        parse_quote!('__q, __R: ::rumpsteak::Role, __N, __V),
+        parse_quote!('__q, __R: ::rumpsteak::Role),
     );
     let (_, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -185,7 +199,7 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type) -> Result<TokenStr
         labels.push(label);
 
         let ty = &mut fields.next().unwrap().ty;
-        augment_type(ty, &name, &value, &exclude);
+        augment_type(ty, &name, &value, &predicate, &effect, &exclude);
         tys.push(&*ty);
     }
 
@@ -200,7 +214,7 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type) -> Result<TokenStr
 
     punctuated_prepend(
         &mut input.generics.params,
-        parse_quote!('__r, __R: ::rumpsteak::Role, __N, __V),
+        parse_quote!('__r, __R: ::rumpsteak::Role),
     );
     let (impl_generics, ty_generics, _) = input.generics.split_for_impl();
 
@@ -227,11 +241,13 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type) -> Result<TokenStr
     output.extend(quote! {
         impl #impl_generics ::rumpsteak::Choices<'__r> for #ident #ty_generics #where_clause {
             type Role = __R;
-            type Name = __N;
-            type Value = __V;
+            type Name = #name;
+            type Value = #value;
+            type Predicate = #predicate;
+            type Effect = #effect;
 
             fn downcast(
-                state: ::rumpsteak::State<'__r, Self::Role, Self::Name, Self::Value>,
+                state: ::rumpsteak::State<'__r, Self::Role, Self::Name, Self::Value, Self::Predicate, Self::Effect>,
                 message: <Self::Role as Role>::Message,
             ) -> ::core::result::Result<Self, <Self::Role as Role>::Message> {
                 #(let message = match ::rumpsteak::Message::downcast(message) {
@@ -252,14 +268,18 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type) -> Result<TokenStr
     Ok(quote!(#input #output))
 }
 
-struct SessionParams(Type, Type);
+struct SessionParams(Type, Type, Type, Type);
 
 impl Parse for SessionParams {
     fn parse(content: ParseStream) -> Result<Self> {
         let type1 = content.parse()?;
         content.parse::<Token![,]>()?;
         let type2 = content.parse()?;
-        Ok(SessionParams(type1, type2))
+        content.parse::<Token![,]>()?;
+        let type3 = content.parse()?;
+        content.parse::<Token![,]>()?;
+        let type4 = content.parse()?;
+        Ok(SessionParams(type1, type2, type3, type4))
     }
 }
 
@@ -267,16 +287,16 @@ pub fn session(attr: TokenStream, input: TokenStream) -> Result<TokenStream> {
     let input = parse2::<Item>(input)?;
     match input {
         Item::Type(input) => {
-            let SessionParams(name, value) = parse2(attr)?;
-            Ok(session_type(input, name, value))
+            let SessionParams(name, value, predicate, effect) = parse2(attr)?;
+            Ok(session_type(input, name, value, predicate, effect))
         },
         Item::Struct(input) => {
-            let SessionParams(name, value) = parse2(attr)?;
-            session_struct(input, name, value)
+            let SessionParams(name, value, predicate, effect) = parse2(attr)?;
+            session_struct(input, name, value, predicate, effect)
         },
         Item::Enum(input) => {
-            let SessionParams(name, value) = parse2(attr)?;
-            session_enum(input, name, value)
+            let SessionParams(name, value, predicate, effect) = parse2(attr)?;
+            session_enum(input, name, value, predicate, effect)
         },
         item => Err(Error::new_spanned(item, "expected a type, struct or enum")),
     }
