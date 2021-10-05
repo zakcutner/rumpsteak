@@ -30,7 +30,7 @@ pub fn roles(input: TokenStream) -> Result<TokenStream> {
             };
 
             let ident = format_ident!("role_{}_{}", i, j);
-            quote! { #ident }
+            quote! { #field_ident: #ident }
         });
 
         let ident = match &field.ident {
@@ -39,7 +39,7 @@ pub fn roles(input: TokenStream) -> Result<TokenStream> {
         };
 
         let ty = &field.ty;
-        quote! { #ident: #ty::new(#(#role),*) }
+        quote! { #ident: #ty { #(#role),* } }
     });
 
     Ok(quote! {

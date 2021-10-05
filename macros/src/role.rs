@@ -23,24 +23,23 @@ pub fn role(input: TokenStream) -> Result<TokenStream> {
     }?;
 
     for (i, field) in fields.iter().enumerate() {
-        if let Ok(route) = parse::attribute::<Type>(&field.attrs, "route", field.span()) {
+        let route = parse::attribute::<Type>(&field.attrs, "route", field.span())?;
 
-            let field_ty = &field.ty;
-            let field_ident = match &field.ident {
-                Some(ident) => ident.to_token_stream(),
-                None => Index::from(i).to_token_stream(),
-            };
+        let field_ty = &field.ty;
+        let field_ident = match &field.ident {
+            Some(ident) => ident.to_token_stream(),
+            None => Index::from(i).to_token_stream(),
+        };
 
-            output.extend(quote! {
-                impl #impl_generics ::rumpsteak::Route<#route> for #ident #ty_generics #where_clause {
-                    type Route = #field_ty;
+        output.extend(quote! {
+            impl #impl_generics ::rumpsteak::Route<#route> for #ident #ty_generics #where_clause {
+                type Route = #field_ty;
 
-                    fn route(&mut self) -> &mut Self::Route {
-                        &mut self.#field_ident
-                    }
+                fn route(&mut self) -> &mut Self::Route {
+                    &mut self.#field_ident
                 }
-            });
-        }
+            }
+        });
     }
 
     Ok(output)

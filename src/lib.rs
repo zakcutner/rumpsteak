@@ -9,6 +9,7 @@ use std::{
     convert::Infallible,
     future::Future,
     marker::{self, PhantomData},
+    fmt::Debug,
 };
 use thiserror::Error;
 use std::collections::HashMap;
@@ -82,7 +83,7 @@ pub trait Route<R>: Role + Sized {
 pub trait Predicate {
     type Name;
     type Value;
-    type Error;
+    type Error: Debug;
 
     /// This function checks whether the predicate holds on the current values
     /// of variables.
@@ -151,7 +152,7 @@ impl<N, V> SideEffect for Constant<N, V> {
 /// the `Send` will take it state and convert it into the continuation.
 ///
 /// The generic `N` is the type of variable names and `V` the type of variable values.
-pub struct State<'r, R: Role, N, V, P = Tautology<N, V>, S = Constant<N, V>>
+pub struct State<'r, R: Role, N, V, P, S>
 where
     P: Predicate<Name = N, Value = V>,
     S: SideEffect<Name = N, Value = V>,
@@ -183,8 +184,10 @@ pub trait FromState<'r> {
     type Role: Role;
     type Name;
     type Value;
+    type Predicate: Predicate<Name = Self::Name, Value = Self::Value>;
+    type Effect: SideEffect<Name = Self::Name, Value = Self::Value>;
 
-    fn from_state(state: State<'r, Self::Role, Self::Name, Self::Value>) -> Self;
+    fn from_state(state: State<'r, Self::Role, Self::Name, Self::Value, Self::Predicate, Self::Effect>) -> Self;
 }
 
 pub trait Session<'r>: FromState<'r> + private::Session {}
@@ -196,38 +199,66 @@ pub trait IntoSession<'r>: FromState<'r> {
 }
 
 /// This structure represents a terminated protocol.
-pub struct End<'r, R: Role, N, V> {
-    _state: State<'r, R, N, V>,
+pub struct End<'r, R: Role, N, V, P, S> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>,
+{
+    _state: State<'r, R, N, V, P, S>,
 }
 
-impl<'r, R: Role, N, V> FromState<'r> for End<'r, R, N, V> {
+impl<'r, R: Role, N, V, P, S> FromState<'r> for End<'r, R, N, V, P, S> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>,
+{
     type Role = R;
     type Name = N;
     type Value = V;
+    type Predicate = P;
+    type Effect = S;
 
     #[inline]
-    fn from_state(state: State<'r, Self::Role, N, V>) -> Self {
+    fn from_state(state: State<'r, Self::Role, N, V, P, S>) -> Self {
         Self { _state: state }
     }
 }
 
-impl<'r, R: Role, N, V> private::Session for End<'r, R, N, V> {}
+impl<'r, R: Role, N, V, P, S> private::Session for End<'r, R, N, V, P, S> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>,
+{}
 
-impl<'r, R: Role, N, V> Session<'r> for End<'r, R, N, V> {}
+impl<'r, R: Role, N, V, P, S> Session<'r> for End<'r, R, N, V, P, S> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>,
+{}
 
 /// This structure represents a protocol which next action is to send.
-pub struct Send<'q, Q: Role, N, V, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>> {
-    state: State<'q, Q, N, V>,
+pub struct Send<'q, Q: Role, N, V, P, U, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>> 
+where
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+{
+    state: State<'q, Q, N, V, P, U>,
     phantom: PhantomData<(R, L, S)>,
 }
 
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V> FromState<'q> for Send<'q, Q, N, V, R, L, S> {
+impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V, P, U> FromState<'q> for Send<'q, Q, N, V, P, U, R, L, S>
+where
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+{
     type Role = Q;
     type Name = N;
     type Value = V;
+    type Predicate = P;
+    type Effect = U;
 
     #[inline]
-    fn from_state(state: State<'q, Self::Role, N, V>) -> Self {
+    fn from_state(state: State<'q, Self::Role, N, V, P, U>) -> Self {
         Self {
             state,
             phantom: PhantomData,
@@ -235,35 +266,60 @@ impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V> F
     }
 }
 
-impl<'q, Q: Route<R>, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V> Send<'q, Q, N, V, R, L, S>
+impl<'q, Q: Route<R>, R, L, S, N, V, P, U> Send<'q, Q, N, V, P, U, R, L, S>
 where
     Q::Message: Message<L>,
     Q::Route: Sink<Q::Message> + Unpin,
+    S: FromState<'q, Role = Q, Name = N, Value = V, Predicate = P, Effect = U>,
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
 {
     #[inline]
-    pub async fn send(self, label: L) -> Result<S, SendError<Q, R>> {
+    pub async fn send(mut self, label: L) -> Result<S, SendError<Q, R>> {
+        println!("Sending");
+        self.state.predicate.check(&self.state.variables).unwrap();
         self.state.role.route().send(Message::upcast(label)).await?;
+        self.state.effect.side_effect(&mut self.state.variables);
         Ok(FromState::from_state(self.state))
     }
 }
 
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V> private::Session for Send<'q, Q, N, V, R, L, S> {}
+impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V, P, U> private::Session for Send<'q, Q, N, V, P, U, R, L, S> 
+where
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+{}
 
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V> Session<'q> for Send<'q, Q, N, V, R, L, S> {}
+impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V, P, U> Session<'q> for Send<'q, Q, N, V, P, U, R, L, S> 
+where
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+{}
 
 /// This structure represents a protocol which next action is to receive.
-pub struct Receive<'q, Q: Role, N, V, R, L, S: FromState<'q, Role = Q>> {
-    state: State<'q, Q, N, V>,
+pub struct Receive<'q, Q: Role, N, V, P, U, R, L, S: FromState<'q, Role = Q>> 
+where
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+{
+    state: State<'q, Q, N, V, P, U>,
     phantom: PhantomData<(R, L, S)>,
 }
 
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, N, V> FromState<'q> for Receive<'q, Q, N, V, R, L, S> {
+impl<'q, Q: Role, R, L, S, N, V, P, U> FromState<'q> for Receive<'q, Q, N, V, P, U, R, L, S> 
+where
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+    S: FromState<'q, Role = Q, Predicate = P, Effect = U>,
+{
     type Role = Q;
     type Name = N;
     type Value = V;
+    type Predicate = P;
+    type Effect = U;
 
     #[inline]
-    fn from_state(state: State<'q, Self::Role, N, V>) -> Self {
+    fn from_state(state: State<'q, Self::Role, N, V, P, U>) -> Self {
         Self {
             state,
             phantom: PhantomData,
@@ -271,10 +327,13 @@ impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, N, V> FromState<'q> for Rece
     }
 }
 
-impl<'q, Q: Route<R>, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V> Receive<'q, Q, N, V, R, L, S>
+impl<'q, Q: Route<R>, R, L, S, N, V, P, U> Receive<'q, Q, N, V, P, U, R, L, S>
 where
     Q::Message: Message<L>,
     Q::Route: Stream<Item = Q::Message> + Unpin,
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+    S: FromState<'q, Role = Q, Name = N, Value = V, Predicate = P, Effect = U>,
 {
     #[inline]
     pub async fn receive(self) -> Result<(L, S), ReceiveError> {
@@ -285,26 +344,45 @@ where
     }
 }
 
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, N, V> private::Session for Receive<'q, Q, N, V, R, L, S> {}
+impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, N, V, P, U> private::Session for Receive<'q, Q, N, V, P, U, R, L, S> 
+where
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+{}
 
-impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, N, V> Session<'q> for Receive<'q, Q, N, V, R, L, S> {}
+impl<'q, Q: Role, R, L, S, N, V, P, U> Session<'q> for Receive<'q, Q, N, V, P, U, R, L, S> 
+where
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+    S: FromState<'q, Role = Q, Predicate = P, Effect = U>,
+{}
 
 pub trait Choice<'r, L> {
     type Session: FromState<'r>;
 }
 
-pub struct Select<'q, Q: Role, N, V, R, C> {
-    state: State<'q, Q, N, V>,
+pub struct Select<'q, Q: Role, N, V, P, S, R, C> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>
+{
+    state: State<'q, Q, N, V, P, S>,
     phantom: PhantomData<(R, C)>,
 }
 
-impl<'q, Q: Role, R, C, N, V> FromState<'q> for Select<'q, Q, N, V, R, C> {
+impl<'q, Q: Role, R, C, N, V, P, S> FromState<'q> for Select<'q, Q, N, V, P, S, R, C> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>
+{
     type Role = Q;
     type Name = N;
     type Value = V;
+    type Predicate = P;
+    type Effect = S;
 
     #[inline]
-    fn from_state(state: State<'q, Self::Role, N, V>) -> Self {
+    fn from_state(state: State<'q, Self::Role, N, V, P, S>) -> Self {
         Self {
             state,
             phantom: PhantomData,
@@ -312,49 +390,74 @@ impl<'q, Q: Role, R, C, N, V> FromState<'q> for Select<'q, Q, N, V, R, C> {
     }
 }
 
-impl<'q, Q: Route<R>, R, C, N, V> Select<'q, Q, N, V, R, C>
+impl<'q, Q: Route<R>, R, C, N, V, P, S> Select<'q, Q, N, V, P, S, R, C>
 where
     Q::Route: Sink<Q::Message> + Unpin,
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>
 {
     #[inline]
-    pub async fn select<L>(self, label: L) -> Result<<C as Choice<'q, L>>::Session, SendError<Q, R>>
+    pub async fn select<L>(mut self, label: L) -> Result<<C as Choice<'q, L>>::Session, SendError<Q, R>>
     where
         Q::Message: Message<L>,
         C: Choice<'q, L>,
-        C::Session: FromState<'q, Role = Q, Name = N, Value = V>,
+        C::Session: FromState<'q, Role = Q, Name = N, Value = V, Predicate = P, Effect = S>,
     {
+        println!("Selecting");
+        self.state.predicate.check(&self.state.variables).unwrap();
         self.state.role.route().send(Message::upcast(label)).await?;
+        self.state.effect.side_effect(&mut self.state.variables);
         Ok(FromState::from_state(self.state))
     }
 }
 
-impl<'q, Q: Role, R, C, N, V> private::Session for Select<'q, Q, N, V, R, C> {}
+impl<'q, Q: Role, R, C, N, V, P, S> private::Session for Select<'q, Q, N, V, P, S, R, C> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>
+{}
 
-impl<'q, Q: Role, R, C, N, V> Session<'q> for Select<'q, Q, N, V, R, C> {}
+impl<'q, Q: Role, R, C, N, V, P, S> Session<'q> for Select<'q, Q, N, V, P, S, R, C> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>
+{}
 
 pub trait Choices<'r>: Sized {
     type Role: Role;
     type Name;
     type Value;
+    type Predicate: Predicate<Name = Self::Name, Value = Self::Value>;
+    type Effect: SideEffect<Name = Self::Name, Value = Self::Value>;
 
     fn downcast(
-        state: State<'r, Self::Role, Self::Name, Self::Value>,
+        state: State<'r, Self::Role, Self::Name, Self::Value, Self::Predicate, Self::Effect>,
         message: <Self::Role as Role>::Message,
     ) -> Result<Self, <Self::Role as Role>::Message>;
 }
 
-pub struct Branch<'q, Q: Role, N, V, R, C> {
-    state: State<'q, Q, N, V>,
+pub struct Branch<'q, Q: Role, N, V, P, S, R, C> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>,
+{
+    state: State<'q, Q, N, V, P, S>,
     phantom: PhantomData<(R, C)>,
 }
 
-impl<'q, Q: Role, R, C, N, V> FromState<'q> for Branch<'q, Q, N, V, R, C> {
+impl<'q, Q: Role, R, C, N, V, P, S> FromState<'q> for Branch<'q, Q, N, V, P, S, R, C> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>,
+{
     type Role = Q;
     type Name = N;
     type Value = V;
+    type Predicate = P;
+    type Effect = S;
 
     #[inline]
-    fn from_state(state: State<'q, Self::Role, N, V>) -> Self {
+    fn from_state(state: State<'q, Self::Role, N, V, P, S>) -> Self {
         Self {
             state,
             phantom: PhantomData,
@@ -362,9 +465,12 @@ impl<'q, Q: Role, R, C, N, V> FromState<'q> for Branch<'q, Q, N, V, R, C> {
     }
 }
 
-impl<'q, Q: Route<R>, R, C: Choices<'q, Role = Q, Name = N, Value = V>, N, V> Branch<'q, Q, N, V, R, C>
+impl<'q, Q: Route<R>, R, C, N, V, P, S> Branch<'q, Q, N, V, P, S, R, C>
 where
     Q::Route: Stream<Item = Q::Message> + Unpin,
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>,
+    C: Choices<'q, Role = Q, Name = N, Value = V, Predicate = P, Effect = S>,
 {
     #[inline]
     pub async fn branch(self) -> Result<C, ReceiveError> {
@@ -375,31 +481,51 @@ where
     }
 }
 
-impl<'q, Q: Role, R, C, N, V> private::Session for Branch<'q, Q, N, V, R, C> {}
+impl<'q, Q: Role, R, C, N, V, P, S> private::Session for Branch<'q, Q, N, V, P, S, R, C> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>,
+{}
 
-impl<'q, Q: Role, R, C, N, V> Session<'q> for Branch<'q, Q, N, V, R, C> {}
+impl<'q, Q: Role, R, C, N, V, P, S> Session<'q> for Branch<'q, Q, N, V, P, S, R, C> 
+where
+    P: Predicate<Name = N, Value = V>,
+    S: SideEffect<Name = N, Value = V>,
+{}
 
 #[inline]
-pub async fn session<'r, R: Role, S: FromState<'r, Role = R>, T, F, N, V>(
+pub async fn session<'r, R: Role, S, T, F, N, V, P, U>(
     role: &'r mut R,
+    map: HashMap<N, V>,
+    predicate: P,
+    effect: U,
     f: impl FnOnce(S) -> F,
 ) -> T
 where
-    F: Future<Output = (T, End<'r, R, N, V>)>,
+    F: Future<Output = (T, End<'r, R, N, V, P, U>)>,
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+    S: FromState<'r, Role = R, Name = N, Value = V, Predicate = P, Effect = U>
 {
-    let output = try_session(role, |s| f(s).map(Ok)).await;
+    let output = try_session(role, map, predicate, effect, |s| f(s).map(Ok)).await;
     output.unwrap_or_else(|infallible: Infallible| match infallible {})
 }
 
 #[inline]
-pub async fn try_session<'r, R: Role, S: FromState<'r, Role = R>, T, E, F, N, V>(
+pub async fn try_session<'r, R: Role, S, T, E, F, N, V, P, U>(
     role: &'r mut R,
+    map: HashMap<N, V>,
+    predicate: P,
+    effect: U,
     f: impl FnOnce(S) -> F,
 ) -> Result<T, E>
 where
-    F: Future<Output = Result<(T, End<'r, R, N, V>), E>>,
+    F: Future<Output = Result<(T, End<'r, R, N, V, P, U>), E>>,
+    P: Predicate<Name = N, Value = V>,
+    U: SideEffect<Name = N, Value = V>,
+    S: FromState<'r, Role = R, Name = N, Value = V, Predicate = P, Effect = U>
 {
-    let session = FromState::from_state(State::new(role, HashMap::new(), Tautology::new(), Constant::new()));
+    let session = FromState::from_state(State::new(role, map, predicate, effect));
     f(session).await.map(|(output, _)| output)
 }
 
