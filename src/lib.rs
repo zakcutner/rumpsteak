@@ -95,7 +95,7 @@ pub trait Predicate {
     /// analysis).
     ///
     /// The default implementation always returns `Ok(())`.
-    fn check(&self, m: &HashMap<Self::Name, Self::Value>) -> Result<(), Self::Error> {
+    fn check(&self, _m: &HashMap<Self::Name, Self::Value>) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -126,7 +126,7 @@ pub trait SideEffect {
     /// This function modifies the values of variables.
     ///
     /// The default implementation does not modify the variables.
-    fn side_effect(&mut self, m: &mut HashMap<Self::Name, Self::Value>) {}
+    fn side_effect(&mut self, _m: &mut HashMap<Self::Name, Self::Value>) {}
 }
 
 /// The `Constant` struct implements a side effect that does nothing.
@@ -336,10 +336,12 @@ where
     S: FromState<'q, Role = Q, Name = N, Value = V, Predicate = P, Effect = U>,
 {
     #[inline]
-    pub async fn receive(self) -> Result<(L, S), ReceiveError> {
+    pub async fn receive(mut self) -> Result<(L, S), ReceiveError> {
+        self.state.predicate.check(&self.state.variables).unwrap();
         let message = self.state.role.route().next().await;
         let message = message.ok_or(ReceiveError::EmptyStream)?;
         let label = message.downcast().or(Err(ReceiveError::UnexpectedType))?;
+        self.state.effect.side_effect(&mut self.state.variables);
         Ok((label, FromState::from_state(self.state)))
     }
 }
@@ -473,9 +475,11 @@ where
     C: Choices<'q, Role = Q, Name = N, Value = V, Predicate = P, Effect = S>,
 {
     #[inline]
-    pub async fn branch(self) -> Result<C, ReceiveError> {
+    pub async fn branch(mut self) -> Result<C, ReceiveError> {
+        self.state.predicate.check(&self.state.variables).unwrap();
         let message = self.state.role.route().next().await;
         let message = message.ok_or(ReceiveError::EmptyStream)?;
+        self.state.effect.side_effect(&mut self.state.variables);
         let choice = C::downcast(self.state, message);
         choice.or(Err(ReceiveError::UnexpectedType))
     }

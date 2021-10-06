@@ -17,7 +17,7 @@ use std::{error::Error, fs, io, path::Path, result};
 
 type Result<T, E = Box<dyn Error>> = result::Result<T, E>;
 
-type Graph<'a> = petgraph::Graph<GraphNode<'a>, GraphEdge>;
+type Graph<'a> = petgraph::Graph<GraphNode<'a>, GraphEdge<'a>>;
 type GraphMap<'a> = <Graph<'a> as Visitable>::Map;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,13 +44,17 @@ impl<'a> GraphNode<'a> {
 }
 
 #[derive(Debug)]
-struct GraphEdge {
+struct GraphEdge<'a> {
     label: usize,
+    predicate: Option<&'a str>
 }
 
-impl GraphEdge {
-    fn new(label: usize) -> Self {
-        Self { label }
+impl<'a> GraphEdge<'a> {
+    fn new(label: usize, predicate: Option<&'a str>) -> Self {
+        Self {
+            label,
+            predicate,
+        }
     }
 }
 
