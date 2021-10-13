@@ -1,7 +1,7 @@
 #![allow(clippy::upper_case_acronyms)]
 
-use super::{Direction, Graph, GraphEdge, GraphNode, Result};
-use indexmap::{map::Entry, IndexMap, IndexSet};
+use super::{Graph, GraphEdge, GraphNode, Result};
+use indexmap::{IndexMap, IndexSet};
 use pest::{
     error::{Error as PestError, ErrorVariant as PestErrorVariant},
     Parser as _, Span,
@@ -64,15 +64,6 @@ struct Node<'a> {
     name: &'a str,
 }
 
-impl<'a> Node<'a> {
-    fn parse(statement: Pair<'a>) -> Self {
-        let mut pairs = statement.into_inner();
-        Self {
-            name: next_pair(&mut pairs, Rule::ident).unwrap().as_str(),
-        }
-    }
-}
-
 impl<'a> From<NodeStmt<'a, label::Label<'a>>> for Node<'a> {
     fn from(node: NodeStmt<'a, label::Label<'a>>) -> Node<'a> {
         node.node.into()
@@ -82,86 +73,6 @@ impl<'a> From<NodeStmt<'a, label::Label<'a>>> for Node<'a> {
 impl<'a> From<NodeID<'a>> for Node<'a> {
     fn from(node: NodeID<'a>) -> Node<'a> {
         Node { name: node.id }
-    }
-}
-
-struct Edge<'a> {
-    from: &'a str,
-    to: &'a str,
-    role: (usize, Span<'a>),
-    direction: (Direction, Span<'a>),
-    edge: GraphEdge<'a>,
-}
-
-impl<'a> Edge<'a> {
-    fn parse(context: &mut Context<'a>, name: &str, statement: Pair<'a>) -> Result<Self> {
-        let mut pairs = statement.into_inner();
-
-        //                 direction
-        //                 V
-        // 1 -> 2 [label="S!HELLO(i32)", ];
-        // ^    ^                 ^^^
-        // from to          ^^^^^ parameters
-        //                ^ label
-        //                role
-        
-        // Initial and destination local state
-        let from = next_pair(&mut pairs, Rule::ident).unwrap().as_str();
-        let to = next_pair(&mut pairs, Rule::ident).unwrap().as_str();
-
-        // pairs contains the label specification
-        let mut pairs = next_pair(&mut pairs, Rule::label).unwrap().into_inner();
-
-        let role = next_pair(&mut pairs, Rule::ident).unwrap();
-        if role.as_str() == name {
-            let message = "cannot send to or receive from own role";
-            return Err(error(role.as_span(), message.to_owned()));
-        }
-
-        let i = context.roles.get_index_of(role.as_str());
-        let role = (
-            i.ok_or_else(|| error(role.as_span(), "unknown role name".to_owned()))?,
-            role.as_span(),
-        );
-
-        let direction = pairs.next().unwrap();
-        let direction = (
-            match direction.as_rule() {
-                Rule::send => Direction::Send,
-                Rule::receive => Direction::Receive,
-                _ => unreachable!(),
-            },
-            direction.as_span(),
-        );
-
-        let label = next_pair(&mut pairs, Rule::ident).unwrap();
-        let parameters = next_pair(&mut pairs, Rule::parameters).unwrap();
-        let parameters = parameters.into_inner().map(|p| p.as_str()).collect();
-
-        let label = match context.labels.entry(label.as_str()) {
-            Entry::Occupied(entry) if entry.get() != &parameters => {
-                let message = format!(
-                    "label was previously used with different parameters `{}({})`",
-                    label.as_str(),
-                    Parameters(entry.get())
-                );
-                Err(error(label.as_span(), message))
-            }
-            Entry::Occupied(entry) => Ok(entry.index()),
-            Entry::Vacant(entry) => {
-                let i = entry.index();
-                entry.insert(parameters);
-                Ok(i)
-            }
-        }?;
-
-        Ok(Self {
-            from,
-            to,
-            role,
-            direction,
-            edge: GraphEdge::new(label, None),
-        })
     }
 }
 
@@ -220,52 +131,6 @@ impl<'a> TryFrom<(DotGraph<'a, label::Label<'a>>, &mut Context<'a>)> for Digraph
     }
 }
 
-impl<'a> Digraph<'a> {
-    fn parse(context: &mut Context<'a>, name: &str, statements: Pair<'a>) -> Result<Self> {
-        let (mut nodes, mut edges) = (Vec::new(), Vec::new());
-        for statement in statements.into_inner() {
-            match statement.as_rule() {
-                Rule::node => nodes.push(Node::parse(statement)),
-                Rule::edge => edges.push(Edge::parse(context, name, statement)?),
-                _ => unreachable!(),
-            }
-        }
-
-        let mut graph = Graph::with_capacity(nodes.len(), edges.len());
-        let nodes = nodes
-            .into_iter()
-            .map(|node| (node.name, graph.add_node(GraphNode::new(node.name))))
-            .collect::<HashMap<_, _>>();
-
-        for edge in edges {
-            let (from, to) = (nodes[edge.from], nodes[edge.to]);
-            let node = &mut graph[from];
-            let (role, direction) = (&mut node.role, &mut node.direction);
-
-            if let Some(role) = role {
-                if *role != edge.role.0 {
-                    let message =
-                        "all outgoing transitions must either send to or receive from the same role";
-                    return Err(error(edge.role.1, message.to_owned()));
-                }
-            }
-
-            if let Some(direction) = direction {
-                if *direction != edge.direction.0 {
-                    let message = "outgoing transitions must all send or all receive";
-                    return Err(error(edge.direction.1, message.to_owned()));
-                }
-            }
-
-            *role = Some(edge.role.0);
-            *direction = Some(edge.direction.0);
-            graph.add_edge(from, to, edge.edge);
-        }
-
-        Ok(Self { graph })
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct Tree<'a> {
     pub roles: Vec<(&'a str, Graph<'a>)>,
@@ -292,15 +157,13 @@ impl<'a> Tree<'a> {
                 return Err(error(role.as_span(), message.to_owned()));
             }
 
-            let statements = next_pair(&mut digraph, Rule::statements).unwrap();
-            Ok((role.as_str(), statements, dot_graph))
+            Ok((role.as_str(), dot_graph))
         });
 
         let roles = roles
             .collect::<Result<Vec<_>>>()?
             .into_iter()
-            .map(|(name, statements, dot_graph)| {
-                //Ok((name, Digraph::parse(&mut context, name, statements)?.graph))
+            .map(|(name, dot_graph)| {
                 //TODO: handle error properly if try_from fails
                 Ok((name, Digraph::try_from((dot_graph, &mut context)).unwrap().graph))
             });
