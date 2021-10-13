@@ -1,5 +1,4 @@
 use proc_macro2::TokenStream;
-use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use std::{collections::HashSet, mem};
 use syn::{
