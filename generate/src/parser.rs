@@ -150,14 +150,13 @@ impl<'a> Tree<'a> {
                     } else {
                         None
                     });
-            let mut digraph = Parser::parse(Rule::digraph, input)?;
-            let role = next_pair(&mut digraph, Rule::ident).unwrap();
-            if !context.roles.insert(role.as_str()) {
+            let role = dot_graph.name.unwrap(); // panic if the graph is not named
+            if !context.roles.insert(role) {
                 let message = "duplicate graphs found for role";
-                return Err(error(role.as_span(), message.to_owned()));
+                return Err(error_msg(message.to_owned()));
             }
 
-            Ok((role.as_str(), dot_graph))
+            Ok((role, dot_graph))
         });
 
         let roles = roles
@@ -177,6 +176,24 @@ impl<'a> Tree<'a> {
 
 fn error(span: Span<'_>, message: String) -> Box<dyn Error> {
     PestError::<Rule>::new_from_span(PestErrorVariant::CustomError { message }, span).into()
+}
+
+
+#[derive(Debug)]
+struct StrError {
+    msg: String,
+}
+
+impl Display for StrError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+impl Error for StrError {}
+
+fn error_msg(message: String) -> Box<dyn Error> {
+    Box::new(StrError{ msg: message })
 }
 
 fn next_pair<'i>(pairs: &mut Pairs<'i>, rule: Rule) -> Option<Pair<'i>> {
