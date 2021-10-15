@@ -15,7 +15,7 @@ use std::{
 };
 
 extern crate dot_parser;
-use dot_parser::{
+use dot_parser::ast::{
     Graph as DotGraph,
     Stmt,
     NodeStmt,
