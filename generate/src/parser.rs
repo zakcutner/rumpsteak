@@ -2,11 +2,6 @@
 
 use super::{Graph, GraphEdge, GraphNode, Result};
 use indexmap::{IndexMap, IndexSet};
-use pest::{
-    error::{Error as PestError, ErrorVariant as PestErrorVariant},
-    Parser as _, Span,
-};
-use pest_derive::Parser;
 use std::{
     collections::HashMap,
     error::Error,
@@ -21,30 +16,6 @@ use dot_parser::ast::{
     NodeStmt,
     NodeID,
 };
-
-type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
-type Pair<'i> = pest::iterators::Pair<'i, Rule>;
-
-#[derive(Parser)]
-#[grammar = "parser/digraph.pest"]
-struct Parser;
-
-#[derive(Debug, PartialEq, Eq)]
-struct Parameters<'a>(&'a [&'a str]);
-
-impl Display for Parameters<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut parameters = self.0.iter();
-        if let Some(parameter) = parameters.next() {
-            write!(f, "{}", parameter)?;
-            for parameter in parameters {
-                write!(f, ", {}", parameter)?;
-            }
-        }
-
-        Ok(())
-    }
-}
 
 struct Context<'a> {
     roles: IndexSet<&'a str>,
@@ -174,18 +145,13 @@ impl<'a> Tree<'a> {
     }
 }
 
-fn error(span: Span<'_>, message: String) -> Box<dyn Error> {
-    PestError::<Rule>::new_from_span(PestErrorVariant::CustomError { message }, span).into()
-}
-
-
 #[derive(Debug)]
 struct StrError {
     msg: String,
 }
 
 impl Display for StrError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.msg)
     }
 }
@@ -194,13 +160,6 @@ impl Error for StrError {}
 
 fn error_msg(message: String) -> Box<dyn Error> {
     Box::new(StrError{ msg: message })
-}
-
-fn next_pair<'i>(pairs: &mut Pairs<'i>, rule: Rule) -> Option<Pair<'i>> {
-    match pairs.next() {
-        Some(pair) if pair.as_rule() == rule => Some(pair),
-        _ => None,
-    }
 }
 
 #[derive(Copy, Clone)]
