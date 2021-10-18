@@ -56,7 +56,7 @@ impl<'a> TryFrom<(DotGraph<'a, label::Label<'a>>, &mut Context<'a>)> for Digraph
     fn try_from(tuple: (DotGraph<'a, label::Label<'a>>, &mut Context<'a>)) -> Result<Self, Self::Error> {
         let (value, context) = tuple;
         let mut nodes: Vec<Node<'a>> = Vec::new();
-        let mut edges = Vec::new();
+        let mut edges: Vec<dot_parser::ast::EdgeStmt<'a, label::Label<'a>>> = Vec::new();
 
         if let Err(()) = check_graph_edges(&value) {
             return Err(());
@@ -94,7 +94,7 @@ impl<'a> TryFrom<(DotGraph<'a, label::Label<'a>>, &mut Context<'a>)> for Digraph
             let to_index = node_indexes[to];
             graph[from_index].direction = Some(direction.into());
             graph[from_index].role = Some(role_index);
-            let edge = GraphEdge::new(payload_index, None);
+            let edge = GraphEdge::new(payload_index);
             graph.add_edge(from_index, to_index, edge);
         }
 
@@ -112,15 +112,20 @@ impl<'a> Tree<'a> {
     pub fn parse(inputs: &'a [String]) -> Result<Self> {
         let mut context = Context::with_capacity(inputs.len());
         let roles = inputs.iter().map(|input| {
-            let dot_graph = DotGraph::read_dot(input)
-                .unwrap()
-                .filter_map(|(key, value)| 
-                    if key == "label" {
-                        let label = label::Label::from_str(value).unwrap();
-                        Some(label)
-                    } else {
-                        None
-                    });
+            let dot_graph = 
+                match DotGraph::read_dot(input) {
+                    Ok(graph) => graph.filter_map(|(key, value)| 
+                        if key == "label" {
+                            let label = label::Label::from_str(value).unwrap();
+                            Some(label)
+                        } else {
+                            None
+                        }),
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        panic!();
+                        }
+                };
             let role = dot_graph.name.unwrap(); // panic if the graph is not named
             if !context.roles.insert(role) {
                 let message = "duplicate graphs found for role";
@@ -316,12 +321,13 @@ mod label {
                 let direction = inner.next().unwrap().as_rule().try_into().unwrap(); 
                 let payload = inner.next().unwrap().as_str();
                 let mut parameters = Vec::new();
-                for pair in inner {
+                let params = inner.next();
+                for pair in params {
                     if pair.as_str() != "" {
                         parameters.push(pair.as_str());
                     }
                 }
-                Ok(Label { role, direction, payload, parameters })
+                Ok(Label { role, direction, payload, parameters})
             } else {
                 Err(())
             }
