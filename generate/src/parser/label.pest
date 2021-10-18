@@ -1,0 +1,14 @@
+
+char = @{ ASCII_ALPHANUMERIC | "_" }
+raw_ident = @{ ASCII_DIGIT+ | (ASCII_ALPHA ~ char*) | ("_" ~ char+) }
+
+quoted_ident = { "\"" ~ (char | "\\\"")* ~ "\"" }
+ident = { quoted_ident | raw_ident }
+
+send = { "!" }
+receive = { "?" }
+
+predicate = { ident ~ "<" ~ ident }
+
+parameters = { (ident ~ ",")* ~ ident? }
+label = { "\""? ~ ident ~ (send | receive) ~ ident ~ "(" ~ parameters ~ ")" ~ ( ":" ~ predicate)? ~ "\"" }

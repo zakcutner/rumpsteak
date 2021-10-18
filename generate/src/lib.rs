@@ -88,6 +88,8 @@ impl<'a, P: AsRef<Path>> Builder<'a, P> {
             camel: self.name.to_camel_case(),
             roles: generate_roles(&tree.roles),
             labels: generate_labels(&tree.labels),
+            value_str: tree.value_str.to_string(),
+            name_str: tree.name_str.to_string(),
         })
     }
 }

@@ -151,6 +151,8 @@ pub struct Protocol {
     pub(crate) camel: String,
     pub(crate) roles: Vec<Role>,
     pub(crate) labels: Vec<Label>,
+    pub(crate) name_str: String,
+    pub(crate) value_str: String,
 }
 
 impl Protocol {

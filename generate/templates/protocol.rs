@@ -5,6 +5,8 @@ use ::rumpsteak::{
 };
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
+type Name = {{ name_str }};
+type Value = {{ value_str }};
 
 #[derive(Roles)]
 #[allow(dead_code)]
