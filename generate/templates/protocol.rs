@@ -1,7 +1,7 @@
 use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 #[allow(unused_imports)]
 use ::rumpsteak::{
-    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send,
+    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send, formula,
 };
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;

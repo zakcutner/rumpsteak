@@ -142,6 +142,7 @@ pub(crate) struct Role {
 #[derive(Debug)]
 pub(crate) struct Label {
     pub camel: String,
+    pub param_names: Vec<String>,
     pub parameters: Vec<String>,
 }
 

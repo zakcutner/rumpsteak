@@ -254,14 +254,16 @@ fn generate_roles(roles: &[(&str, Graph<'_>)]) -> Vec<Role> {
         .collect()
 }
 
-fn generate_label((label, parameters): (&&str, &Vec<&str>)) -> Label {
-    let parameters = parameters.iter().cloned().map(ToOwned::to_owned);
+fn generate_label((label, parameters): (&&str, &Vec<(&str, &str)>)) -> Label {
+    let parameters = parameters.iter().cloned().map(|(n, t)| (n.to_owned(), t.to_owned()));
+    let (names, types): (Vec<String>, Vec<String>) = parameters.unzip();
     Label {
         camel: label.to_camel_case(),
-        parameters: parameters.collect(),
+        param_names: names,
+        parameters: types,
     }
 }
 
-fn generate_labels(labels: &IndexMap<&str, Vec<&str>>) -> Vec<Label> {
+fn generate_labels(labels: &IndexMap<&str, Vec<(&str, &str)>>) -> Vec<Label> {
     labels.iter().map(generate_label).collect()
 }
