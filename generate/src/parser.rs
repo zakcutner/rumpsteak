@@ -19,7 +19,7 @@ use dot_parser::ast::{
 
 struct Context<'a> {
     roles: IndexSet<&'a str>,
-    labels: IndexMap<&'a str, Vec<&'a str>>,
+    labels: IndexMap<&'a str, Vec<(&'a str, &'a str)>>,
 }
 
 impl<'a> Context<'a> {
@@ -105,7 +105,7 @@ impl<'a> TryFrom<(DotGraph<'a, label::Label<'a>>, &mut Context<'a>)> for Digraph
 #[derive(Debug)]
 pub(crate) struct Tree<'a> {
     pub roles: Vec<(&'a str, Graph<'a>)>,
-    pub labels: IndexMap<&'a str, Vec<&'a str>>,
+    pub labels: IndexMap<&'a str, Vec<(&'a str, &'a str)>>,
 }
 
 impl<'a> Tree<'a> {
@@ -143,10 +143,14 @@ impl<'a> Tree<'a> {
                 Ok((name, Digraph::try_from((dot_graph, &mut context)).unwrap().graph))
             });
 
-        Ok(Tree {
+        let tree = Tree {
             roles: roles.collect::<Result<Vec<_>>>()?,
             labels: context.labels,
-        })
+        };
+
+        eprintln!("{:#?}", tree);
+
+        Ok(tree)
     }
 }
 
@@ -177,7 +181,7 @@ enum NodeDirection<'a> {
 
 fn check_graph_edges<'a>(graph: &DotGraph<'a, label::Label<'a>>) -> Result<(), ()> {
     let mut nodes: IndexMap<&str, NodeDirection> = (&graph.stmts).into_iter().filter_map(|stmt| stmt.get_node_ref()).map(|n| (n.name(), NodeDirection::Unspecified)).collect();
-    let mut payload_types: IndexMap<&str, &Vec<&str>> = IndexMap::new();
+    let mut payload_types: IndexMap<&str, &Vec<(&str, &str)>> = IndexMap::new();
 
     for edge in (&graph.stmts).into_iter().filter_map(|e| e.get_edge_ref()) {
         let from = edge.node.id;
@@ -310,7 +314,7 @@ mod label {
         pub (in crate) role: &'a str,
         pub (in crate) direction: Direction, 
         pub (in crate) payload: &'a str,
-        pub (in crate) parameters: Vec<&'a str>,
+        pub (in crate) parameters: Vec<(&'a str, &'a str)>, // (name, type)
     }
 
     impl<'a> Label<'a> {
@@ -324,7 +328,13 @@ mod label {
                 let params = inner.next();
                 for pair in params {
                     if pair.as_str() != "" {
-                        parameters.push(pair.as_str());
+                        let inner = pair.into_inner();
+                        for param in inner {
+                            let mut inner = param.into_inner();
+                            let name = inner.next().unwrap().as_str();
+                            let typ = inner.next().unwrap().as_str();
+                            parameters.push((name, typ));
+                        }
                     }
                 }
                 Ok(Label { role, direction, payload, parameters})
@@ -341,7 +351,7 @@ mod label {
             Label::parse(label.unwrap().next().unwrap())
         }
         
-        pub (in crate) fn fields(self) -> (&'a str, Direction, &'a str, Vec<&'a str>) {
+        pub (in crate) fn fields(self) -> (&'a str, Direction, &'a str, Vec<(&'a str, &'a str)>) {
             (self.role, self.direction, self.payload, self.parameters)
         }
     }
