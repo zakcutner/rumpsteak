@@ -74,7 +74,7 @@ where
 
     fn check(&self, m: &HashMap<Self::Name, Self::Value>) -> Result<(), Self::Error> {
         let lhs = m.get(&LHS).ok_or(())?;
-        let rhs = m.get(&LHS).ok_or(())?;
+        let rhs = m.get(&RHS).ok_or(())?;
         if lhs < rhs {
             Ok(())
         } else {

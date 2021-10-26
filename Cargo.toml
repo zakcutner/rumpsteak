@@ -35,6 +35,8 @@ futures = "0.3"
 rumpsteak-fsm = { path = "fsm", version = "0.1", optional = true }
 rumpsteak-macros = { path = "macros", version = "0.1" }
 thiserror = "1.0"
+pest = "2.1"
+pest_derive = "2.1"
 
 [dev-dependencies]
 criterion = "0.3"

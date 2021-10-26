@@ -41,7 +41,7 @@ fn unroll_type(mut ty: &mut Type) -> &mut Type {
     ty
 }
 
-fn augment_type(mut ty: &mut Type, name: &Type, value: &Type, predicate: &Type, effect: &Type, exclude: &HashSet<Ident>) {
+fn augment_type(mut ty: &mut Type, name: &Type, value: &Type, effect: &Type, exclude: &HashSet<Ident>) {
     while let Type::Path(path) = unroll_type(ty) {
         if *path == parse_quote!(Self) {
             break;
@@ -67,7 +67,7 @@ fn augment_type(mut ty: &mut Type, name: &Type, value: &Type, predicate: &Type, 
 
         let is_empty = args.is_empty();
         if STATES.contains(&&*segment.ident.to_string()) {
-            punctuated_prepend(args, parse_quote!('__r, __R, #name, #value, #predicate, #effect));
+            punctuated_prepend(args, parse_quote!('__r, __R, #name, #value, #effect));
         } else {
             punctuated_prepend(args, parse_quote!('__r, __R));
         }
@@ -83,17 +83,17 @@ fn augment_type(mut ty: &mut Type, name: &Type, value: &Type, predicate: &Type, 
     }
 }
 
-fn session_type(mut input: ItemType, name: Type, value: Type, predicate: Type, effect: Type) -> TokenStream {
+fn session_type(mut input: ItemType, name: Type, value: Type, effect: Type) -> TokenStream {
     let exclude = idents_set(&input.generics.params);
     punctuated_prepend(
         &mut input.generics.params,
         parse_quote!('__r, __R: ::rumpsteak::Role),
     );
-    augment_type(&mut input.ty, &name, &value, &predicate, &effect, &exclude);
+    augment_type(&mut input.ty, &name, &value, &effect, &exclude);
     input.into_token_stream()
 }
 
-fn session_struct(mut input: ItemStruct, name: Type, value: Type, predicate: Type, effect: Type) -> Result<TokenStream> {
+fn session_struct(mut input: ItemStruct, name: Type, value: Type, effect: Type) -> Result<TokenStream> {
     let ident = &input.ident;
     let exclude = idents_set(&input.generics.params);
 
@@ -109,7 +109,7 @@ fn session_struct(mut input: ItemStruct, name: Type, value: Type, predicate: Typ
     }
 
     let field = input.fields.iter_mut().next().unwrap();
-    augment_type(&mut field.ty, &name, &value, &predicate, &effect, &exclude);
+    augment_type(&mut field.ty, &name, &value, &effect, &exclude);
 
     let field_ty = &field.ty;
     let field_ident = match &field.ident {
@@ -153,7 +153,7 @@ fn session_struct(mut input: ItemStruct, name: Type, value: Type, predicate: Typ
     Ok(quote!(#input #output))
 }
 
-fn session_enum(mut input: ItemEnum, name: Type, value: Type, predicate: Type, effect: Type) -> Result<TokenStream> {
+fn session_enum(mut input: ItemEnum, name: Type, value: Type, effect: Type) -> Result<TokenStream> {
     if input.variants.is_empty() {
         let message = "expected at least one variant";
         return Err(Error::new_spanned(&input.variants, message));
@@ -198,7 +198,7 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type, predicate: Type, e
         labels.push(label);
 
         let ty = &mut fields.next().unwrap().ty;
-        augment_type(ty, &name, &value, &predicate, &effect, &exclude);
+        augment_type(ty, &name, &value, &effect, &exclude);
         tys.push(&*ty);
     }
 
@@ -242,11 +242,10 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type, predicate: Type, e
             type Role = __R;
             type Name = #name;
             type Value = #value;
-            type Predicate = #predicate;
             type Effect = #effect;
 
             fn downcast(
-                state: ::rumpsteak::State<'__r, Self::Role, Self::Name, Self::Value, Self::Predicate, Self::Effect>,
+                state: ::rumpsteak::State<'__r, Self::Role, Self::Name, Self::Value, Self::Effect>,
                 message: <Self::Role as Role>::Message,
             ) -> ::core::result::Result<Self, <Self::Role as Role>::Message> {
                 #(let message = match ::rumpsteak::Message::downcast(message) {
@@ -267,7 +266,7 @@ fn session_enum(mut input: ItemEnum, name: Type, value: Type, predicate: Type, e
     Ok(quote!(#input #output))
 }
 
-struct SessionParams(Type, Type, Type, Type);
+struct SessionParams(Type, Type, Type);
 
 impl Parse for SessionParams {
     fn parse(content: ParseStream) -> Result<Self> {
@@ -276,9 +275,7 @@ impl Parse for SessionParams {
         let type2 = content.parse()?;
         content.parse::<Token![,]>()?;
         let type3 = content.parse()?;
-        content.parse::<Token![,]>()?;
-        let type4 = content.parse()?;
-        Ok(SessionParams(type1, type2, type3, type4))
+        Ok(SessionParams(type1, type2, type3))
     }
 }
 
@@ -286,16 +283,16 @@ pub fn session(attr: TokenStream, input: TokenStream) -> Result<TokenStream> {
     let input = parse2::<Item>(input)?;
     match input {
         Item::Type(input) => {
-            let SessionParams(name, value, predicate, effect) = parse2(attr)?;
-            Ok(session_type(input, name, value, predicate, effect))
+            let SessionParams(name, value, effect) = parse2(attr)?;
+            Ok(session_type(input, name, value, effect))
         },
         Item::Struct(input) => {
-            let SessionParams(name, value, predicate, effect) = parse2(attr)?;
-            session_struct(input, name, value, predicate, effect)
+            let SessionParams(name, value, effect) = parse2(attr)?;
+            session_struct(input, name, value, effect)
         },
         Item::Enum(input) => {
-            let SessionParams(name, value, predicate, effect) = parse2(attr)?;
-            session_enum(input, name, value, predicate, effect)
+            let SessionParams(name, value, effect) = parse2(attr)?;
+            session_enum(input, name, value, effect)
         },
         item => Err(Error::new_spanned(item, "expected a type, struct or enum")),
     }
