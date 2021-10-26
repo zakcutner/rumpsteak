@@ -1,0 +1,5 @@
+ltn = { ASCII_ALPHA ~ "<" ~ ASCII_ALPHA }
+
+formula = { ltn }
+
+WHITESPACE = _{ " " | "\t" | NEWLINE }
