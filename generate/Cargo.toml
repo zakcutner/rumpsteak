@@ -16,7 +16,7 @@ required-features = ["clap"]
 
 [dependencies]
 askama = { git = "https://github.com/djc/askama", rev = "95e346e" }
-clap = { version = "3.0.0-beta", optional = true }
+clap = { version = "=3.0.0-beta.5", optional = true }
 heck = "0.3"
 indexmap = "1.6"
 pest = "2.1"

@@ -1,8 +1,8 @@
-use clap::Clap;
+use clap::Parser;
 use rumpsteak_generate::Builder;
 use std::{error::Error, process::exit};
 
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version, author, about)]
 struct Arguments {
     /// Sets the name of the protocol.
