@@ -54,17 +54,17 @@ impl<N, V> Predicate for Tautology<N, V> {
     type Error = ();
 }
 
-pub struct LTnConst<V: Ord, const LHS: char, const RHS: char> {
+pub struct LTnVar<V: Ord, const LHS: char, const RHS: char> {
     _p: PhantomData<V>,
 }
 
-impl<V: Ord, const LHS: char, const RHS: char> Default for LTnConst<V, LHS, RHS> {
+impl<V: Ord, const LHS: char, const RHS: char> Default for LTnVar<V, LHS, RHS> {
     fn default() -> Self {
         Self { _p: PhantomData }
     }
 }
 
-impl<V: Ord, const LHS: char, const RHS: char> Predicate for LTnConst<V, LHS, RHS>
+impl<V: Ord, const LHS: char, const RHS: char> Predicate for LTnVar<V, LHS, RHS>
 where
     V: std::cmp::Ord
 {
@@ -82,6 +82,29 @@ where
         }
     }
 }
+
+pub struct LTnConst<const LHS: char, const RHS: i32> {}
+
+impl<const LHS: char, const RHS: i32> Default for LTnConst<LHS, RHS> {
+    fn default() -> Self { Self {} }
+}
+
+impl<const LHS: char, const RHS: i32> Predicate for LTnConst<LHS, RHS>
+{
+    type Name = char;
+    type Value = i32;
+    type Error = ();
+
+    fn check(&self, m: &HashMap<Self::Name, Self::Value>) -> Result<(), Self::Error> {
+        let lhs = m.get(&LHS).ok_or(())?;
+        if lhs < &RHS {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
 
 pub struct LTn<N, V> {
     lhs: N,
