@@ -128,7 +128,7 @@ impl<'a> Tree<'a> {
                 };
             let role = dot_graph.name.unwrap(); // panic if the graph is not named
             if !context.roles.insert(role) {
-                let message = "duplicate graphs found for role";
+                let message = format!("Duplicate graphs found for role {}", role);
                 return Err(error_msg(message.to_owned()));
             }
 
