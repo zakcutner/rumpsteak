@@ -1,8 +1,8 @@
-digraph G {
+digraph B {
   0;
   1;
   
   
-  0 -> 1 [label="A?Ping(u32)", ];
+  0 -> 1 [label="A?Ping(a: u32)", ];
   
   }
