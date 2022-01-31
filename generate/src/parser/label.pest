@@ -13,3 +13,5 @@ predicate = { ident ~ "<" ~ ident }
 param = { ident ~ ":" ~ ident }
 parameters = { (param ~ ",")* ~ param? }
 label = { "\""? ~ ident ~ (send | receive) ~ ident ~ "(" ~ parameters ~ ")" ~ ( ":" ~ predicate)? ~ "\"" }
+
+WHITESPACE = _{ " " }
