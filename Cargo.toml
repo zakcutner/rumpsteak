@@ -35,6 +35,11 @@ futures = "0.3"
 rumpsteak-fsm = { path = "fsm", version = "0.1", optional = true }
 rumpsteak-macros = { path = "macros", version = "0.1" }
 thiserror = "1.0"
+pest = "2.1"
+pest_derive = "2.1"
+aepl = { path = "../MPST-Endpoint-Program/aepl" }
+aepl_rumpsteak_derive = { path = "../MPST-Endpoint-Program/aepl_rumpsteak_derive" }
+aepl_rumpsteak = { path = "../MPST-Endpoint-Program/rumpsteak" }
 
 [dev-dependencies]
 criterion = "0.3"
