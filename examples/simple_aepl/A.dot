@@ -1,0 +1,8 @@
+digraph G {
+  0;
+  1;
+  
+  
+  0 -> 1 [label="B!Ping(u32)", ];
+  
+  }

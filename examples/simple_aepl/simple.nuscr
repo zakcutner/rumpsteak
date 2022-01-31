@@ -1,0 +1,3 @@
+global protocol Simple(role A, role B) {
+	Ping(u32) from A to B;
+}
