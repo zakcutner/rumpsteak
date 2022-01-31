@@ -1,5 +1,8 @@
-use crate::fsm::Transition;
-use std::fmt::{self, Display, Formatter};
+use crate::TransitionRef;
+use std::{
+    convert::Infallible,
+    fmt::{self, Display, Formatter},
+};
 
 #[derive(Clone, Copy)]
 pub struct Index(usize);
@@ -12,13 +15,13 @@ pub struct Snapshot {
 }
 
 #[derive(Debug)]
-pub struct Prefix<'a, R, L> {
-    transitions: Vec<(bool, Transition<&'a R, &'a L>)>,
+pub struct Prefix<'a, R, N> {
+    transitions: Vec<(bool, TransitionRef<'a, R, N, Infallible>)>,
     start: usize,
     removed: Vec<usize>,
 }
 
-impl<R, L> Default for Prefix<'_, R, L> {
+impl<R, N> Default for Prefix<'_, R, N> {
     fn default() -> Self {
         Self {
             transitions: Default::default(),
@@ -28,12 +31,12 @@ impl<R, L> Default for Prefix<'_, R, L> {
     }
 }
 
-impl<'a, R, L> Prefix<'a, R, L> {
+impl<'a, R, N> Prefix<'a, R, N> {
     pub fn is_empty(&self) -> bool {
         self.start >= self.transitions.len()
     }
 
-    pub fn first(&self) -> Option<&Transition<&'a R, &'a L>> {
+    pub(super) fn first(&self) -> Option<&TransitionRef<'a, R, N, Infallible>> {
         if let Some((removed, transition)) = self.transitions.get(self.start) {
             assert!(!removed);
             return Some(transition);
@@ -42,7 +45,7 @@ impl<'a, R, L> Prefix<'a, R, L> {
         None
     }
 
-    pub fn push(&mut self, transition: Transition<&'a R, &'a L>) {
+    pub(super) fn push(&mut self, transition: TransitionRef<'a, R, N, Infallible>) {
         self.transitions.push((false, transition));
     }
 
@@ -83,7 +86,7 @@ impl<'a, R, L> Prefix<'a, R, L> {
     pub fn is_modified(&self, snapshot: &Snapshot) -> bool
     where
         R: Eq,
-        L: Eq,
+        N: Eq,
     {
         assert!(self.valid_snapshot(snapshot));
         self.transitions[self.start..] != self.transitions[..snapshot.size][snapshot.start..]
@@ -102,17 +105,19 @@ impl<'a, R, L> Prefix<'a, R, L> {
         self.start = snapshot.start;
     }
 
-    pub fn iter_full(&self) -> impl Iterator<Item = (Index, &Transition<&'a R, &'a L>)> {
+    pub(super) fn iter_full(
+        &self,
+    ) -> impl Iterator<Item = (Index, &TransitionRef<'a, R, N, Infallible>)> {
         let prefixes = self.transitions.iter().enumerate().skip(self.start);
         prefixes.filter_map(|(i, (removed, transition))| (!removed).then(|| (Index(i), transition)))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Transition<&'a R, &'a L>> {
+    pub(super) fn iter(&self) -> impl Iterator<Item = &TransitionRef<'a, R, N, Infallible>> {
         self.iter_full().map(|(_, transition)| transition)
     }
 }
 
-impl<R: Display, L: Display> Display for Prefix<'_, R, L> {
+impl<R: Display, N: Display> Display for Prefix<'_, R, N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut transitions = self.iter();
         if let Some(transition) = transitions.next() {

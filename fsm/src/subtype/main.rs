@@ -1,13 +1,10 @@
 use argh::FromArgs;
-use rumpsteak::{
-    fsm::{
-        dot::{self, ParseError},
-        Fsm,
-    },
-    subtype,
+use rumpsteak_fsm::{
+    dot::{self, ParseErrors},
+    subtype, Fsm,
 };
 use std::{
-    borrow::Cow,
+    convert::Infallible,
     error::Error,
     fmt::Display,
     fs,
@@ -81,10 +78,7 @@ fn read_file(path: &str) -> String {
     }
 }
 
-fn unwrap_fsm<'a>(
-    fsm: Result<Fsm<Cow<'a, str>, Cow<'a, str>>, ParseError>,
-    path: &str,
-) -> Fsm<Cow<'a, str>, Cow<'a, str>> {
+fn unwrap_fsm<R, N, E>(fsm: Result<Fsm<R, N, E>, ParseErrors>, path: &str) -> Fsm<R, N, E> {
     match fsm {
         Ok(fsm) => fsm,
         Err(err) => error(format_args!("Error parsing '{}'", path), err),
@@ -106,7 +100,7 @@ fn main() {
 
     let mut stdout = StandardStream::stdout(options.color.into());
     for (i, (left, right)) in left.zip(right).enumerate() {
-        let left = unwrap_fsm(left, &options.left);
+        let left = unwrap_fsm::<String, String, Infallible>(left, &options.left);
         let right = unwrap_fsm(right, &options.right);
 
         let is_subtype = subtype::is_subtype(&left, &right, options.visits);

@@ -13,11 +13,6 @@ categories = ["asynchronous", "concurrency"]
 [lib]
 bench = false
 
-[[bin]]
-name = "subtype"
-path = "src/subtype/main.rs"
-required-features = ["argh", "atty", "parsing", "subtyping", "termcolor"]
-
 [[bench]]
 name = "double_buffering"
 harness = false
@@ -29,40 +24,30 @@ harness = false
 [[bench]]
 name = "subtype"
 harness = false
-required-features = ["serialize", "subtyping"]
+required-features = ["serialize"]
 
 [[bench]]
 name = "three_adder"
 harness = false
 
 [dependencies]
-argh = { version = "0.1", optional = true }
-atty = { version = "0.2", optional = true }
-enum-kinds = { version = "0.5", optional = true }
-futures = { version = "0.3", optional = true }
-logos = { version = "0.12", optional = true }
-memchr = { version = "2.4", optional = true }
-petgraph = { version = "0.5", optional = true }
-rumpsteak-macros = { path = "macros", version = "0.1", optional = true }
-termcolor = { version = "1.1", optional = true }
-thiserror = { version = "1.0", optional = true }
+futures = "0.3"
+rumpsteak-fsm = { path = "fsm", version = "0.1", optional = true }
+rumpsteak-macros = { path = "macros", version = "0.1" }
+thiserror = "1.0"
 
 [dev-dependencies]
 criterion = "0.3"
 futures = { version = "0.3", features = ["thread-pool"] }
 num-complex = "0.4"
 rand = { version = "0.8" }
+rumpsteak-fsm = { path = "fsm", features = ["subtyping"] }
 rumpsteak-oneshot = { path = "oneshot" }
 tempfile = "3.2"
 tokio = { version = "1.6", features = ["macros", "rt", "time"] }
 
 [features]
-default = ["session"]
-fsm = ["petgraph", "thiserror"]
-parsing = ["enum-kinds", "fsm", "logos", "memchr"]
-serialize = ["fsm", "rumpsteak-macros/serialize", "session"]
-session = ["futures", "rumpsteak-macros", "thiserror"]
-subtyping = ["fsm"]
+serialize = ["rumpsteak-fsm", "rumpsteak-macros/serialize"]
 
 [profile.release]
 debug = true
@@ -71,4 +56,4 @@ debug = true
 debug = true
 
 [workspace]
-members = ["caching", "generate", "macros", "oneshot"]
+members = ["caching", "fsm", "generate", "macros", "oneshot"]

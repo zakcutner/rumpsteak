@@ -9,8 +9,8 @@ use self::{
     pair::Pair,
     prefix::{Index, Prefix, Snapshot},
 };
-use crate::fsm::{Action, Fsm, StateIndex, Transition};
-use std::{iter::Peekable, mem};
+use crate::{Action, Fsm, StateIndex, TransitionRef};
+use std::{convert::Infallible, iter::Peekable, mem};
 
 #[derive(Clone)]
 struct Previous {
@@ -30,15 +30,18 @@ enum Quantifier {
     Any,
 }
 
-struct SubtypeVisitor<'a, R, L> {
-    fsms: Pair<&'a Fsm<R, L>>,
+struct SubtypeVisitor<'a, R, N> {
+    fsms: Pair<&'a Fsm<R, N, Infallible>>,
     history: Matrix<Previous>,
-    prefixes: Pair<Prefix<'a, R, L>>,
+    prefixes: Pair<Prefix<'a, R, N>>,
 }
 
-impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
+impl<'a, R: Eq, N: Eq> SubtypeVisitor<'a, R, N> {
     #[inline]
-    fn unroll<I: Iterator<Item = (StateIndex, Transition<&'a R, &'a L>)>, const SWAP: bool>(
+    fn unroll<
+        I: Iterator<Item = (StateIndex, TransitionRef<'a, R, N, Infallible>)>,
+        const SWAP: bool,
+    >(
         &mut self,
         mut transitions: Pair<I>,
         mut quantifiers: Pair<Quantifier>,
@@ -152,11 +155,11 @@ impl<'a, R: Eq, L: Eq> SubtypeVisitor<'a, R, L> {
     }
 }
 
-fn reduce<R: Eq, L: Eq>(prefixes: &mut Pair<Prefix<R, L>>) -> bool {
-    fn reorder<R: Eq, L: Eq>(
-        left: &Transition<&R, &L>,
-        rights: &Prefix<R, L>,
-        reject: impl Fn(&Transition<&R, &L>, &Transition<&R, &L>) -> bool,
+fn reduce<R: Eq, N: Eq>(prefixes: &mut Pair<Prefix<R, N>>) -> bool {
+    fn reorder<R: Eq, N: Eq>(
+        left: &TransitionRef<R, N, Infallible>,
+        rights: &Prefix<R, N>,
+        reject: impl Fn(&TransitionRef<R, N, Infallible>, &TransitionRef<R, N, Infallible>) -> bool,
     ) -> Option<Option<Index>> {
         let mut rights = rights.iter_full();
 
@@ -212,7 +215,11 @@ fn reduce<R: Eq, L: Eq>(prefixes: &mut Pair<Prefix<R, L>>) -> bool {
     true
 }
 
-pub fn is_subtype<R: Eq, L: Eq>(left: &Fsm<R, L>, right: &Fsm<R, L>, visits: usize) -> bool {
+pub fn is_subtype<R: Eq, N: Eq>(
+    left: &Fsm<R, N, Infallible>,
+    right: &Fsm<R, N, Infallible>,
+    visits: usize,
+) -> bool {
     if left.role() != right.role() {
         panic!("FSMs are for different roles");
     }
