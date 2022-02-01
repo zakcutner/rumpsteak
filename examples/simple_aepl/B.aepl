@@ -1,0 +1,4 @@
+Endpoint B {
+	let value = receive(value).
+	close;
+}

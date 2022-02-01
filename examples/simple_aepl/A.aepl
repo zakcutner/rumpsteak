@@ -1,0 +1,4 @@
+Endpoint A {
+	let anon = send(ping, B).
+	close;
+}
