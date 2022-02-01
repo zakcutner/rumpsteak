@@ -41,11 +41,15 @@ enum Label {
 
 struct Ping(u32);
 
-#[session]
+#[session(Name, Value)]
 type SimpleA = Send<B, Ping, End>;
 
-#[session]
+#[session(Name, Value)]
 type SimpleB = Receive<A, Ping, End>;
+
+fn new_msg() -> Ping {
+    Ping(1)
+}
 
 from_epl!("examples/simple_aepl/A.aepl", SimpleA, A);
 from_epl!("examples/simple_aepl/B.aepl", SimpleB, B);

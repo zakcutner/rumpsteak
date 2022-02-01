@@ -1,4 +1,5 @@
 Endpoint A {
-	let anon = send(ping, B).
+	let msg = new_msg().
+	let anon = send(msg, B).
 	close;
 }
