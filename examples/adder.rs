@@ -86,8 +86,8 @@ async fn client(role: &mut C) -> Result<()> {
     .await
 }
 
-async fn server(role: &mut S) -> Result<()> {
-    try_session(role, |s: Server<'_, _>| async {
+async fn S_func(s: Server<'_, S>) -> Result<((), End<'_, S>)> 
+{
         let (Hello(u), mut s) = s.receive().await?;
         let s = loop {
             s = match s.branch().await? {
@@ -99,6 +99,12 @@ async fn server(role: &mut S) -> Result<()> {
             };
         };
 
+        Ok(((), s))
+}
+
+async fn server(role: &mut S) -> Result<()> {
+    try_session(role, |s: Server<'_, _>| async {
+        let (res, s) = S_func(s).await?;
         Ok(((), s))
     })
     .await
