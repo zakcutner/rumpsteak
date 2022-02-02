@@ -6,12 +6,10 @@ use futures::{
 };
 #[allow(unused_imports)]
 use ::rumpsteak::{
-    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send, formula,
+    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send,
 };
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
-type Name = char;
-type Value = u32;
 
 #[derive(Roles)]
 #[allow(dead_code)]
@@ -41,10 +39,10 @@ enum Label {
 
 struct Ping(u32);
 
-#[session(Name, Value)]
+#[session]
 type SimpleA = Send<B, Ping, End>;
 
-#[session(Name, Value)]
+#[session]
 type SimpleB = Receive<A, Ping, End>;
 
 fn new_msg() -> Ping {
