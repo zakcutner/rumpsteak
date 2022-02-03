@@ -6,7 +6,7 @@ use futures::{
 };
 #[allow(unused_imports)]
 use ::rumpsteak::{
-    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send,
+    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send, try_session
 };
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
@@ -49,12 +49,29 @@ fn new_msg() -> Ping {
     Ping(1)
 }
 
+fn print_msg(p: Ping) {
+    let Ping(n) = p;
+    println!("Received {}", n);
+}
+
 from_epl!("examples/simple_aepl/A.aepl", SimpleA, A);
 from_epl!("examples/simple_aepl/B.aepl", SimpleB, B);
 
+async fn a(role: &mut A) -> Result<(), Box<dyn std::error::Error>> {
+    try_session(role, |a: SimpleA<'_, _>| async {
+        A(a).await
+    }).await
+}
+
+async fn b(role: &mut B) -> Result<(), Box<dyn std::error::Error>> {
+    try_session(role, |b: SimpleB<'_, _>| async {
+        B(b).await
+    }).await
+}
+
 fn main() {
-    let Roles{ mut a, mut b } = Roles::default();
+    let Roles{ a: mut role_a, b: mut role_b } = Roles::default();
     executor::block_on(async {
-        try_join!(A(&mut a), B(&mut b)).unwrap();
+        try_join!(a(&mut role_a), b(&mut role_b)).unwrap();
     });
 }

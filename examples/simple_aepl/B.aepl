@@ -1,4 +1,5 @@
 Endpoint B {
-	let value = receive(value).
+	let value = receive(endpoint).
+	let _ = print_msg(value).
 	close;
 }
