@@ -11,6 +11,11 @@ use std::{
 pub(crate) struct Route(pub usize);
 
 #[derive(Debug)]
+pub(crate) enum Predicate {
+    LTnVar(String, String),
+}
+
+#[derive(Debug)]
 pub(crate) enum Type {
     End,
     Node(usize),
@@ -18,6 +23,7 @@ pub(crate) enum Type {
         direction: Direction,
         role: usize,
         label: usize,
+        predicate: Option<Predicate>,
         next: Box<Self>,
     },
     Choice {
@@ -70,6 +76,33 @@ impl<'a> TypeFormatter<'a> {
     fn node(&self, node: &usize) -> &str {
         &self.role.nodes[*node]
     }
+
+    fn taut(&self, predicate: &Option<Predicate>) -> String {
+        if let Some(pred) = predicate {
+            match pred {
+                Predicate::LTnVar(a, _) => {
+                    let mut taut = String::from("LTnVar<Value, '");
+                    // taut.push(&a.as_str());
+                    taut = taut + a.as_str();
+                    taut = taut + "', 'y'>";
+                    return taut;
+                }
+            }
+        }
+        return "{}".to_string();
+    }
+
+    fn effect(&self, predicate: &Option<Predicate>) -> String {
+        if let Some(pred) = predicate {
+            match pred {
+                Predicate::LTnVar(_, _) => {
+                    let effect = String::from("Constant<Name, Value>");
+                    return effect;
+                }
+            }
+        }
+        return "{}".to_string();
+    }
 }
 
 impl Display for TypeFormatter<'_> {
@@ -84,12 +117,27 @@ impl Display for TypeFormatter<'_> {
                 direction,
                 role,
                 label,
+                predicate,
                 next,
             } => {
-                let (other, label, next) = (self.role(role), self.label(label), self.with(next));
+                let (other, label, taut, effect, next) = (
+                    self.role(role),
+                    self.label(label),
+                    self.taut(predicate),
+                    self.effect(predicate),
+                    self.with(next),
+                );
                 match direction {
-                    Direction::Send => write!(f, "Send<{}, {}, {}>", other, label, next),
-                    Direction::Receive => write!(f, "Receive<{}, {}, {}>", other, label, next),
+                    Direction::Send => write!(
+                        f,
+                        "Send<{}, {}, {}, {}, {}>",
+                        other, label, taut, effect, next
+                    ),
+                    Direction::Receive => write!(
+                        f,
+                        "Receive<{}, {}, {}, {}, {}>",
+                        other, label, taut, effect, next
+                    ),
                 }
             }
             Type::Choice {
