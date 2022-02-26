@@ -5,7 +5,7 @@ pub use self::template::Protocol;
 
 use self::{
     parser::Tree,
-    template::{Choice, Definition, DefinitionBody, Label, Role, Route, Type},
+    template::{Choice, Definition, DefinitionBody, Label, Predicate, Role, Route, Type},
 };
 use heck::{CamelCase, SnakeCase};
 use indexmap::IndexMap;
@@ -13,7 +13,7 @@ use petgraph::{
     graph::{node_index, NodeIndex},
     visit::{EdgeRef, IntoNodeReferences, VisitMap, Visitable},
 };
-use std::{error::Error, fs, io, path::Path, result};
+use std::{error::Error, fs, io, path::Path, result, str};
 
 type Result<T, E = Box<dyn Error>> = result::Result<T, E>;
 
@@ -175,10 +175,12 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
                 self.visited.visit(node);
 
                 let (next, safe) = self.visit(edge.target());
+                let predicate = parse_expr(edge.weight().predicate);
                 let ty = Type::Message {
                     direction: weight.direction.unwrap(),
                     role: weight.role.unwrap(),
                     label: edge.weight().label,
+                    predicate: predicate,
                     next: next.into(),
                 };
 
@@ -264,4 +266,35 @@ fn generate_label((label, parameters): (&&str, &Vec<(&str, &str)>)) -> Label {
 
 fn generate_labels(labels: &IndexMap<&str, Vec<(&str, &str)>>) -> Vec<Label> {
     labels.iter().map(generate_label).collect()
+}
+
+fn parse_expr(pred: Option<&str>) -> Option<Predicate> {
+    if pred.is_none() {
+        return None;
+    }
+
+    let items: Vec<_> = pred
+        .unwrap()
+        .as_bytes()
+        .chunks(1)
+        .map(str::from_utf8)
+        .collect::<Result<Vec<&str>, _>>()
+        .unwrap();
+    if items.len() < 3 {
+        eprintln!("Incorrect refinement format: {:#?}", pred.unwrap());
+        return None;
+    }
+
+    match items[1] {
+        "<" => {
+            return Some(Predicate::LTnVar(
+                items[0].to_string(),
+                items[2].to_string(),
+            ))
+        }
+        _ => {
+            eprintln!("Unsupported refinement type");
+            return None;
+        }
+    }
 }

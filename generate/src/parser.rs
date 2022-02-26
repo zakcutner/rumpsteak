@@ -332,12 +332,14 @@ mod label {
     impl<'a> Label<'a> {
         pub(in crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
             if let Rule::label = p.as_rule() {
+                // eprintln!("start {:#?}", p);
                 let mut inner = p.into_inner();
                 let role = inner.next().unwrap().as_str();
                 let direction = inner.next().unwrap().as_rule().try_into().unwrap();
                 let payload = inner.next().unwrap().as_str();
                 let mut parameters = Vec::new();
                 let params = inner.next();
+                // eprintln!("{:#?}", params);
                 for pair in params {
                     if pair.as_str() != "" {
                         let inner = pair.into_inner();
