@@ -1,8 +1,33 @@
-use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    executor, try_join,
+};
 #[allow(unused_imports)]
 use ::rumpsteak::{
-    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send, 
+    channel::Bidirectional,
+    session,
+    Branch,
+    End,
+    Message,
+    Receive,
+    Role,
+    Roles,
+    Select,
+    Send,
+    effect::{
+        SideEffect,
+        Constant,
+        Incr,
+    },
+    try_session,
+    predicate::{
+        Tautology,
+        LTnVar
+    },
 };
+
+use std::collections::HashMap;
+use std::error::Error;
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
@@ -38,7 +63,7 @@ struct {{ label.camel }}{% if !label.parameters.is_empty() -%}
 {%- for role in roles %}
 {%- for (i, definition) in role.definitions.iter().rev().enumerate() %}
 {%- let node = role.nodes[definition.node] %}
-#[session]
+#[session(Name, Value)]
 {%- match definition.body %}
 {%- when DefinitionBody::Type with { safe, ty } %}
 {%- if safe|copy_bool %}
