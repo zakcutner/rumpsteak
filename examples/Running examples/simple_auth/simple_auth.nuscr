@@ -1,0 +1,14 @@
+global protocol Proto(role C, role S)
+{
+	Retry(i32) from S to C;
+	Password(i32) from C to S;
+	choice at S {
+		Success(i32) from S to C;
+	} or {
+		Failure(i32) from S to C;
+		do Proto(C, S);
+	} or {
+		Abort(i32) from S to C;
+	}
+
+}
