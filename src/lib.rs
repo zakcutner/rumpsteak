@@ -321,7 +321,6 @@ where
         C: Choice<'q, L>,
         C::Session: FromState<'q, Role = Q, Name = N, Value = V>,
     {
-        println!("Selecting");
         self.predicate.check(&self.state.variables).unwrap();
         self.state.role.route().send(Message::upcast(label)).await?;
         self.effect.side_effect(&mut self.state.variables);
