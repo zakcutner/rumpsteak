@@ -188,7 +188,6 @@ where
 {
     #[inline]
     pub async fn send(mut self, label: L) -> Result<S, SendError<Q, R>> {
-        println!("Sending");
         self.predicate.check(&self.state.variables).unwrap();
         self.state.role.route().send(Message::upcast(label)).await?;
         self.effect.side_effect(&mut self.state.variables);
