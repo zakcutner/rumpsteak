@@ -96,8 +96,8 @@ impl<const LHS: char, const RHS: i32> Predicate for LTnConst<LHS, RHS>
     type Error = ();
 
     fn check(&self, m: &HashMap<Self::Name, Self::Value>) -> Result<(), Self::Error> {
-        let lhs = m.get(&LHS).ok_or(())?;
-        if lhs < &RHS {
+        let lhs: Self::Value = *m.get(&LHS).ok_or(())?;
+        if lhs < RHS {
             Ok(())
         } else {
             Err(())
