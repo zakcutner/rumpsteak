@@ -1,0 +1,15 @@
+digraph S {
+  0;
+  2;
+  3;
+  5;
+  8;
+  
+  
+  0 -> 2 [label="C!Retry(x: i32)", ];
+  2 -> 3 [label="C?Password(x: i32)", ];
+  3 -> 0 [label="C!Failure(x: i32)", ];
+  3 -> 5 [label="C!Success(x: i32)", ];
+  3 -> 8 [label="C!Abort(x: i32)", ];
+  
+  }
