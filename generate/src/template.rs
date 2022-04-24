@@ -30,6 +30,7 @@ pub(crate) enum Type {
         direction: Direction,
         role: usize,
         node: usize,
+        predicate: Option<Predicate>,
     },
 }
 
@@ -40,7 +41,8 @@ impl Type {
             Self::Choice {
                 direction: _,
                 role: _,
-                node: _
+                node: _,
+                predicate: _,
             }
         )
     }
@@ -89,7 +91,7 @@ impl<'a> TypeFormatter<'a> {
                 }
             }
         }
-        return "{}".to_string();
+        return "Tautology<Name, Value>".to_string();
     }
 
     fn effect(&self, predicate: &Option<Predicate>) -> String {
@@ -101,7 +103,7 @@ impl<'a> TypeFormatter<'a> {
                 }
             }
         }
-        return "{}".to_string();
+        return "Constant<Name, Value>".to_string();
     }
 }
 
@@ -144,15 +146,17 @@ impl Display for TypeFormatter<'_> {
                 direction,
                 role,
                 node,
+                predicate,
             } => {
                 let other = self.role(role);
-                let (name, role, node) = (self.name, &self.role.camel, self.node(node));
+                let (other, name, role, node, taut, effect) = (self.role(role), self.name, &self.role.camel, self.node(node), self.taut(predicate),
+                self.effect(predicate));
                 match direction {
                     Direction::Send => {
-                        write!(f, "Select<{}, {}{}{}>", other, name, role, node)
+                        write!(f, "Select<{}, {}, {}, {}{}{}>", other, taut, effect, name, role, node)
                     }
                     Direction::Receive => {
-                        write!(f, "Branch<{}, {}{}{}>", other, name, role, node)
+                        write!(f, "Branch<{}, {}, {}, {}{}{}>", other, taut, effect, name, role, node)
                     }
                 }
             }
