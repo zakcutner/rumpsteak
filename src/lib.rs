@@ -149,7 +149,7 @@ impl<'r, R: Role, N, V> Session<'r> for End<'r, R, N, V>
 /// This structure represents a protocol which next action is to send.
 pub struct Send<'q, Q: Role, N, V, R, L, P, U, S: FromState<'q, Role = Q, Name = N, Value = V>> 
 where
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     U: SideEffect<Name = N, Value = V>,
 {
     state: State<'q, Q, N, V>,
@@ -160,7 +160,7 @@ where
 
 impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V, P, U> FromState<'q> for Send<'q, Q, N, V, R, L, P, U, S>
 where
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     U: SideEffect<Name = N, Value = V>,
 {
     type Role = Q;
@@ -183,12 +183,12 @@ where
     Q::Message: Message<L>,
     Q::Route: Sink<Q::Message> + Unpin,
     S: FromState<'q, Role = Q, Name = N, Value = V>,
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     U: SideEffect<Name = N, Value = V>,
 {
     #[inline]
     pub async fn send(mut self, label: L) -> Result<S, SendError<Q, R>> {
-        self.predicate.check(&self.state.variables).unwrap();
+        self.predicate.check(&self.state.variables, Some(&label)).unwrap();
         self.state.role.route().send(Message::upcast(label)).await?;
         self.effect.side_effect(&mut self.state.variables);
         Ok(FromState::from_state(self.state))
@@ -197,20 +197,20 @@ where
 
 impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V, P, U> private::Session for Send<'q, Q, N, V, R, L, P, U, S> 
 where
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     U: SideEffect<Name = N, Value = V>,
 {}
 
 impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V, P, U> Session<'q> for Send<'q, Q, N, V, R, L, P, U, S> 
 where
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     U: SideEffect<Name = N, Value = V>,
 {}
 
 /// This structure represents a protocol which next action is to receive.
 pub struct Receive<'q, Q: Role, N, V, R, L, P, U, S: FromState<'q, Role = Q>> 
 where
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     U: SideEffect<Name = N, Value = V>,
 {
     state: State<'q, Q, N, V>,
@@ -221,7 +221,7 @@ where
 
 impl<'q, Q: Role, R, L, S, N, V, P, U> FromState<'q> for Receive<'q, Q, N, V, R, L, P, U, S> 
 where
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     U: SideEffect<Name = N, Value = V>,
     S: FromState<'q, Role = Q>,
 {
@@ -244,13 +244,13 @@ impl<'q, Q: Route<R>, R, L, S, N, V, P, U> Receive<'q, Q, N, V, R, L, P, U, S>
 where
     Q::Message: Message<L>,
     Q::Route: Stream<Item = Q::Message> + Unpin,
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     U: SideEffect<Name = N, Value = V>,
     S: FromState<'q, Role = Q, Name = N, Value = V>,
 {
     #[inline]
     pub async fn receive(mut self) -> Result<(L, S), ReceiveError> {
-        self.predicate.check(&self.state.variables).unwrap();
+        self.predicate.check(&self.state.variables, None).unwrap();
         let message = self.state.role.route().next().await;
         let message = message.ok_or(ReceiveError::EmptyStream)?;
         let label = message.downcast().or(Err(ReceiveError::UnexpectedType))?;
@@ -261,13 +261,13 @@ where
 
 impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q>, N, V, P, U> private::Session for Receive<'q, Q, N, V, R, L, P, U, S> 
 where
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     U: SideEffect<Name = N, Value = V>,
 {}
 
 impl<'q, Q: Role, R, L, S, N, V, P, U> Session<'q> for Receive<'q, Q, N, V, R, L, P, U, S> 
 where
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     U: SideEffect<Name = N, Value = V>,
     S: FromState<'q, Role = Q>,
 {}
@@ -307,20 +307,20 @@ where
     }
 }
 
-impl<'q, Q: Route<R>, R, C, N, V, P, S> Select<'q, Q, N, V, R, P, S, C>
+impl<'q, Q: Route<R>, R, C, N, V, P, S, L> Select<'q, Q, N, V, R, P, S, C>
 where
     Q::Route: Sink<Q::Message> + Unpin,
-    P: Predicate<Name = N, Value = V>,
+    P: Predicate<Name = N, Value = V, Label = L>,
     S: SideEffect<Name = N, Value = V>
 {
     #[inline]
-    pub async fn select<L>(mut self, label: L) -> Result<<C as Choice<'q, L>>::Session, SendError<Q, R>>
+    pub async fn select(mut self, label: L) -> Result<<C as Choice<'q, L>>::Session, SendError<Q, R>>
     where
         Q::Message: Message<L>,
         C: Choice<'q, L>,
         C::Session: FromState<'q, Role = Q, Name = N, Value = V>,
     {
-        self.predicate.check(&self.state.variables).unwrap();
+        self.predicate.check(&self.state.variables, Some(&label)).unwrap();
         self.state.role.route().send(Message::upcast(label)).await?;
         self.effect.side_effect(&mut self.state.variables);
         Ok(FromState::from_state(self.state))
@@ -390,7 +390,7 @@ where
 {
     #[inline]
     pub async fn branch(mut self) -> Result<C, ReceiveError> {
-        self.predicate.check(&self.state.variables).unwrap();
+        self.predicate.check(&self.state.variables, None).unwrap();
         let message = self.state.role.route().next().await;
         let message = message.ok_or(ReceiveError::EmptyStream)?;
         self.effect.side_effect(&mut self.state.variables);
@@ -412,7 +412,7 @@ where
 {}
 
 #[inline]
-pub async fn session<'r, R: Role, S, T, F, N, V, P, U>(
+pub async fn session<'r, R: Role, S, T, F, N, V, P, U, L>(
     role: &'r mut R,
     map: HashMap<N, V>,
     f: impl FnOnce(S) -> F,

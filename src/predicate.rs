@@ -20,6 +20,7 @@ use std::hash::Hash;
 pub trait Predicate: Default {
     type Name;
     type Value;
+    type Label;
     type Error: Debug;
 
     /// This function checks whether the predicate holds on the current values
@@ -32,47 +33,50 @@ pub trait Predicate: Default {
     /// analysis).
     ///
     /// The default implementation always returns `Ok(())`.
-    fn check(&self, _m: &HashMap<Self::Name, Self::Value>) -> Result<(), Self::Error> {
+    fn check(&self, _m: &HashMap<Self::Name, Self::Value>, _label: Option<&Self::Label>) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
 /// The `Tautology` struct implements a tautology predicate (i.e. always valid).
-pub struct Tautology<N, V> {
-    _ph: PhantomData<(N, V)>,
+pub struct Tautology<N, V, L> {
+    _ph: PhantomData<(N, V, L)>,
 }
 
-impl<N, V> Default for Tautology<N, V> {
+impl<N, V, L> Default for Tautology<N, V, L> {
     fn default() -> Self {
         Self { _ph: PhantomData }
     }
 }
 
-impl<N, V> Predicate for Tautology<N, V> {
+impl<N, V, L> Predicate for Tautology<N, V, L> {
     type Name = N;
     type Value = V;
+    type Label = L;
+
     type Error = ();
 }
 
-pub struct LTnVar<V: Ord, const LHS: char, const RHS: char> {
-    _p: PhantomData<V>,
+pub struct LTnVar<V: Ord, L, const LHS: char, const RHS: char> {
+    _p: PhantomData<(V, L)>,
 }
 
-impl<V: Ord, const LHS: char, const RHS: char> Default for LTnVar<V, LHS, RHS> {
+impl<L, V: Ord, const LHS: char, const RHS: char> Default for LTnVar<V, L, LHS, RHS> {
     fn default() -> Self {
         Self { _p: PhantomData }
     }
 }
 
-impl<V: Ord, const LHS: char, const RHS: char> Predicate for LTnVar<V, LHS, RHS>
+impl<L, V: Ord, const LHS: char, const RHS: char> Predicate for LTnVar<V, L, LHS, RHS>
 where
     V: std::cmp::Ord
 {
     type Name = char;
     type Value = V;
+    type Label = L;
     type Error = ();
 
-    fn check(&self, m: &HashMap<Self::Name, Self::Value>) -> Result<(), Self::Error> {
+    fn check(&self, m: &HashMap<Self::Name, Self::Value>, _l: Option<&Self::Label>) -> Result<(), Self::Error> {
         let lhs = m.get(&LHS).ok_or(())?;
         let rhs = m.get(&RHS).ok_or(())?;
         if lhs < rhs {
@@ -83,19 +87,22 @@ where
     }
 }
 
-pub struct LTnConst<const LHS: char, const RHS: i32> {}
-
-impl<const LHS: char, const RHS: i32> Default for LTnConst<LHS, RHS> {
-    fn default() -> Self { Self {} }
+pub struct LTnConst<L, const LHS: char, const RHS: i32> {
+    _p: PhantomData<L>
 }
 
-impl<const LHS: char, const RHS: i32> Predicate for LTnConst<LHS, RHS>
+impl<L, const LHS: char, const RHS: i32> Default for LTnConst<L, LHS, RHS> {
+    fn default() -> Self { Self { _p: PhantomData} }
+}
+
+impl<L, const LHS: char, const RHS: i32> Predicate for LTnConst<L, LHS, RHS>
 {
     type Name = char;
     type Value = i32;
+    type Label = L;
     type Error = ();
 
-    fn check(&self, m: &HashMap<Self::Name, Self::Value>) -> Result<(), Self::Error> {
+    fn check(&self, m: &HashMap<Self::Name, Self::Value>, _l: Option<&Self::Label>) -> Result<(), Self::Error> {
         let lhs: Self::Value = *m.get(&LHS).ok_or(())?;
         if lhs < RHS {
             Ok(())
