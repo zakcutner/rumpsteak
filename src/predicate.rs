@@ -1,12 +1,12 @@
-use std::marker::PhantomData;
 use std::collections::HashMap;
-use std::fmt::Debug;
 use std::convert::TryFrom;
+use std::fmt::Debug;
+use std::marker::PhantomData;
 
+use pest::error::Error;
+use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
-use pest::iterators::Pair;
-use pest::error::Error;
 use std::cmp::Ord;
 use std::hash::Hash;
 
@@ -26,14 +26,18 @@ pub trait Predicate: Default {
     /// This function checks whether the predicate holds on the current values
     /// of variables.
     /// It returns a `Result` which is `Ok(())` if the predicate holds, or an
-    /// arbitrary error (of type `E`) if not. 
+    /// arbitrary error (of type `E`) if not.
     /// Most likely, one may want to have `()` as the error type (falling back
     /// on something simili-boolean), but having this generic type allow more
     /// precise analysis in case of failure (some kind of very basic causal
     /// analysis).
     ///
     /// The default implementation always returns `Ok(())`.
-    fn check(&self, _m: &HashMap<Self::Name, Self::Value>, _label: Option<&Self::Label>) -> Result<(), Self::Error> {
+    fn check(
+        &self,
+        _m: &HashMap<Self::Name, Self::Value>,
+        _label: Option<&Self::Label>,
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -69,14 +73,18 @@ impl<L, V: Ord, const LHS: char, const RHS: char> Default for LTnVar<V, L, LHS, 
 
 impl<L, V: Ord, const LHS: char, const RHS: char> Predicate for LTnVar<V, L, LHS, RHS>
 where
-    V: std::cmp::Ord
+    V: std::cmp::Ord,
 {
     type Name = char;
     type Value = V;
     type Label = L;
     type Error = ();
 
-    fn check(&self, m: &HashMap<Self::Name, Self::Value>, _l: Option<&Self::Label>) -> Result<(), Self::Error> {
+    fn check(
+        &self,
+        m: &HashMap<Self::Name, Self::Value>,
+        _l: Option<&Self::Label>,
+    ) -> Result<(), Self::Error> {
         let lhs = m.get(&LHS).ok_or(())?;
         let rhs = m.get(&RHS).ok_or(())?;
         if lhs < rhs {
@@ -88,21 +96,26 @@ where
 }
 
 pub struct LTnConst<L, const LHS: char, const RHS: i32> {
-    _p: PhantomData<L>
+    _p: PhantomData<L>,
 }
 
 impl<L, const LHS: char, const RHS: i32> Default for LTnConst<L, LHS, RHS> {
-    fn default() -> Self { Self { _p: PhantomData} }
+    fn default() -> Self {
+        Self { _p: PhantomData }
+    }
 }
 
-impl<L, const LHS: char, const RHS: i32> Predicate for LTnConst<L, LHS, RHS>
-{
+impl<L, const LHS: char, const RHS: i32> Predicate for LTnConst<L, LHS, RHS> {
     type Name = char;
     type Value = i32;
     type Label = L;
     type Error = ();
 
-    fn check(&self, m: &HashMap<Self::Name, Self::Value>, _l: Option<&Self::Label>) -> Result<(), Self::Error> {
+    fn check(
+        &self,
+        m: &HashMap<Self::Name, Self::Value>,
+        _l: Option<&Self::Label>,
+    ) -> Result<(), Self::Error> {
         let lhs: Self::Value = *m.get(&LHS).ok_or(())?;
         if lhs < RHS {
             Ok(())
@@ -112,7 +125,6 @@ impl<L, const LHS: char, const RHS: i32> Predicate for LTnConst<L, LHS, RHS>
     }
 }
 
-
 pub struct LTn<N, V> {
     lhs: N,
     rhs: N,
@@ -121,7 +133,11 @@ pub struct LTn<N, V> {
 
 impl<N: Eq + Hash, V: PartialOrd> LTn<N, V> {
     fn new(lhs: N, rhs: N) -> Self {
-        Self{ lhs, rhs, _p: PhantomData }
+        Self {
+            lhs,
+            rhs,
+            _p: PhantomData,
+        }
     }
 
     fn check(&self, m: &HashMap<N, V>) -> Result<(), ()> {
@@ -139,23 +155,23 @@ impl<N: Eq + Hash, V: PartialOrd> LTn<N, V> {
 macro_rules! formula {
     ( $lhs:ident < $rhs:ident ) => {
         LTn::new($lhs, $rhs)
-    }
+    };
 }
 
 pub enum Formula<N, V> {
-    LTn(LTn<N, V>)
+    LTn(LTn<N, V>),
 }
 
 #[derive(Parser)]
 #[grammar = "parser/predicate.pest"]
 struct PredicateParser;
 
-impl<'a, N, V> From<Pair<'a, Rule>> for LTn<N, V> 
-where N: From<&'a str> + std::hash::Hash + std::cmp::Eq,
-      V: std::cmp::Ord
+impl<'a, N, V> From<Pair<'a, Rule>> for LTn<N, V>
+where
+    N: From<&'a str> + std::hash::Hash + std::cmp::Eq,
+    V: std::cmp::Ord,
 {
-    fn from(p: Pair<'a, Rule>) -> LTn<N, V> 
-    {
+    fn from(p: Pair<'a, Rule>) -> LTn<N, V> {
         let mut pairs = p.into_inner();
         let lhs: N = pairs.next().unwrap().as_str().into();
         let rhs: N = pairs.next().unwrap().as_str().into();
@@ -165,13 +181,14 @@ where N: From<&'a str> + std::hash::Hash + std::cmp::Eq,
 }
 
 impl<'a, N, V> TryFrom<&'a str> for Formula<N, V>
-where N: From<&'a str> + std::hash::Hash + std::cmp::Eq,
-      V: std::cmp::Ord
+where
+    N: From<&'a str> + std::hash::Hash + std::cmp::Eq,
+    V: std::cmp::Ord,
 {
     type Error = Error<Rule>;
 
     fn try_from(s: &'a str) -> Result<Formula<N, V>, Error<Rule>> {
-        let mut pairs = PredicateParser::parse(Rule::ltn , s)?;
+        let mut pairs = PredicateParser::parse(Rule::ltn, s)?;
         let pair = pairs.next().unwrap();
         let formula = match pair.as_rule() {
             Rule::ltn => Formula::LTn(pair.into()),
