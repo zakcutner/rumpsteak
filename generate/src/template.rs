@@ -13,6 +13,7 @@ pub(crate) struct Route(pub usize);
 #[derive(Debug)]
 pub(crate) enum Predicate {
     LTnVar(String, String),
+    GTnVar(String, String),
 }
 
 #[derive(Debug)]
@@ -84,7 +85,12 @@ impl<'a> TypeFormatter<'a> {
             match pred {
                 Predicate::LTnVar(a, _) => {
                     let mut taut = String::from("LTnVar<Value, '");
-                    // taut.push(&a.as_str());
+                    taut = taut + a.as_str();
+                    taut = taut + "', 'y'>";
+                    return taut;
+                }
+                Predicate::GTnVar(a, _) => {
+                    let mut taut = String::from("GTnVar<Value, '");
                     taut = taut + a.as_str();
                     taut = taut + "', 'y'>";
                     return taut;
@@ -98,6 +104,10 @@ impl<'a> TypeFormatter<'a> {
         if let Some(pred) = predicate {
             match pred {
                 Predicate::LTnVar(_, _) => {
+                    let effect = String::from("Constant<Name, Value>");
+                    return effect;
+                }
+                Predicate::GTnVar(_, _) => {
                     let effect = String::from("Constant<Name, Value>");
                     return effect;
                 }
@@ -149,14 +159,28 @@ impl Display for TypeFormatter<'_> {
                 predicate,
             } => {
                 let other = self.role(role);
-                let (other, name, role, node, taut, effect) = (self.role(role), self.name, &self.role.camel, self.node(node), self.taut(predicate),
-                self.effect(predicate));
+                let (other, name, role, node, taut, effect) = (
+                    self.role(role),
+                    self.name,
+                    &self.role.camel,
+                    self.node(node),
+                    self.taut(predicate),
+                    self.effect(predicate),
+                );
                 match direction {
                     Direction::Send => {
-                        write!(f, "Select<{}, {}, {}, {}{}{}>", other, taut, effect, name, role, node)
+                        write!(
+                            f,
+                            "Select<{}, {}, {}, {}{}{}>",
+                            other, taut, effect, name, role, node
+                        )
                     }
                     Direction::Receive => {
-                        write!(f, "Branch<{}, {}, {}, {}{}{}>", other, taut, effect, name, role, node)
+                        write!(
+                            f,
+                            "Branch<{}, {}, {}, {}{}{}>",
+                            other, taut, effect, name, role, node
+                        )
                     }
                 }
             }

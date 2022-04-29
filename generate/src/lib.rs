@@ -293,6 +293,12 @@ fn parse_expr(pred: Option<&str>) -> Option<Predicate> {
                 items[2].to_string(),
             ))
         }
+        ">" => {
+            return Some(Predicate::GTnVar(
+                items[0].to_string(),
+                items[2].to_string(),
+            ))
+        }
         _ => {
             eprintln!("Unsupported refinement type");
             return None;

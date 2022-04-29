@@ -22,7 +22,8 @@ use ::rumpsteak::{
     try_session,
     predicate::{
         Tautology,
-        LTnVar
+        LTnVar,
+        GTnVar
     },
 };
 

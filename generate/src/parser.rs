@@ -365,7 +365,7 @@ mod label {
         pub(in crate) fn from_str(s: &'a str) -> Result<Self, ()> {
             let label = LabelParser::parse(Rule::label, s);
             if let Err(e) = &label {
-                println!("{}", e);
+                eprintln!("{}", e);
             }
             Label::parse(label.unwrap().next().unwrap())
         }
