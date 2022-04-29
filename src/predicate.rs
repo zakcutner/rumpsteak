@@ -95,6 +95,40 @@ where
     }
 }
 
+pub struct GTnVar<V: Ord, L, const LHS: char, const RHS: char> {
+    _p: PhantomData<(V, L)>,
+}
+
+impl<L, V: Ord, const LHS: char, const RHS: char> Default for GTnVar<V, L, LHS, RHS> {
+    fn default() -> Self {
+        Self { _p: PhantomData }
+    }
+}
+
+impl<L, V: Ord, const LHS: char, const RHS: char> Predicate for GTnVar<V, L, LHS, RHS>
+where
+    V: std::cmp::Ord,
+{
+    type Name = char;
+    type Value = V;
+    type Label = L;
+    type Error = ();
+
+    fn check(
+        &self,
+        m: &HashMap<Self::Name, Self::Value>,
+        _l: Option<&Self::Label>,
+    ) -> Result<(), Self::Error> {
+        let lhs = m.get(&LHS).ok_or(())?;
+        let rhs = m.get(&RHS).ok_or(())?;
+        if lhs > rhs {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
 pub struct LTnConst<L, const LHS: char, const RHS: i32> {
     _p: PhantomData<L>,
 }
