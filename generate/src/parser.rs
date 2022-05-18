@@ -1,5 +1,7 @@
 #![allow(clippy::upper_case_acronyms)]
 
+use crate::template::Predicate;
+
 use super::{Graph, GraphEdge, GraphNode, Result};
 use indexmap::{IndexMap, IndexSet};
 use std::{
@@ -76,7 +78,7 @@ impl<'a> TryFrom<(DotGraph<'a, label::Label<'a>>, &mut Context<'a>)> for Digraph
 
         for edge in edges {
             let attr = edge.attr.unwrap().elems[0].elems[0].clone();
-            let (role, direction, payload, params) = attr.fields();
+            let (role, direction, payload, params, predicate) = attr.fields();
 
             if !context.labels.contains_key(payload) {
                 context.labels.insert(payload, params);
@@ -91,7 +93,7 @@ impl<'a> TryFrom<(DotGraph<'a, label::Label<'a>>, &mut Context<'a>)> for Digraph
             let to_index = node_indexes[to];
             graph[from_index].direction = Some(direction.into());
             graph[from_index].role = Some(role_index);
-            let edge = GraphEdge::new(payload_index);
+            let edge = GraphEdge::new(payload_index, predicate.into());
             graph.add_edge(from_index, to_index, edge);
         }
 
@@ -322,24 +324,41 @@ mod label {
     }
 
     #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
+    pub(in crate) enum Predicate<'a> {
+        LTnConst(&'a str, &'a str),
+        None,
+    }
+
+    impl<'a> Into<super::super::Predicate> for Predicate<'a> {
+        fn into(self) -> super::super::Predicate {
+            match self {
+                Predicate::LTnConst(a, b) => {
+                    super::super::Predicate::LTnConst(a.to_string(), b.to_string())
+                }
+                Predicate::None => super::super::Predicate::None,
+                // Predicate::Receive => super::super::Direction::Receive,
+            }
+        }
+    }
+
+    #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
     pub struct Label<'a> {
         pub(in crate) role: &'a str,
         pub(in crate) direction: Direction,
         pub(in crate) payload: &'a str,
         pub(in crate) parameters: Vec<(&'a str, &'a str)>, // (name, type)
+        pub(in crate) predicate: Predicate<'a>,
     }
 
     impl<'a> Label<'a> {
         pub(in crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
             if let Rule::label = p.as_rule() {
-                // eprintln!("start {:#?}", p);
                 let mut inner = p.into_inner();
                 let role = inner.next().unwrap().as_str();
                 let direction = inner.next().unwrap().as_rule().try_into().unwrap();
                 let payload = inner.next().unwrap().as_str();
                 let mut parameters = Vec::new();
                 let params = inner.next();
-                // eprintln!("{:#?}", params);
                 for pair in params {
                     if pair.as_str() != "" {
                         let inner = pair.into_inner();
@@ -351,11 +370,25 @@ mod label {
                         }
                     }
                 }
+                let mut predicate = Predicate::None;
+                if let Some(p) = inner.next() {
+                    let mut inner = p.clone().into_inner();
+                    let x = inner.next().unwrap().as_str();
+                    let op = inner.next().unwrap();
+                    let y = inner.next().unwrap().as_str();
+                    match op.as_rule() {
+                        Rule::ltn => predicate = Predicate::LTnConst(x, y),
+                        _ => (),
+                    }
+                };
+
+                // let predicate = inner.next().map(|p| p.as_str());
                 Ok(Label {
                     role,
                     direction,
                     payload,
                     parameters,
+                    predicate
                 })
             } else {
                 Err(())
@@ -370,8 +403,22 @@ mod label {
             Label::parse(label.unwrap().next().unwrap())
         }
 
-        pub(in crate) fn fields(self) -> (&'a str, Direction, &'a str, Vec<(&'a str, &'a str)>) {
-            (self.role, self.direction, self.payload, self.parameters)
+        pub(in crate) fn fields(
+            self,
+        ) -> (
+            &'a str,
+            Direction,
+            &'a str,
+            Vec<(&'a str, &'a str)>,
+            Predicate<'a>,
+        ) {
+            (
+                self.role,
+                self.direction,
+                self.payload,
+                self.parameters,
+                self.predicate,
+            )
         }
     }
 }

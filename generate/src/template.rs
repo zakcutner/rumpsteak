@@ -10,10 +10,11 @@ use std::{
 #[derive(Debug)]
 pub(crate) struct Route(pub usize);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum Predicate {
-    LTnVar(String, String),
-    GTnVar(String, String),
+    LTnConst(String, String),
+    GTnConst(String, String),
+    None,
 }
 
 #[derive(Debug)]
@@ -24,14 +25,14 @@ pub(crate) enum Type {
         direction: Direction,
         role: usize,
         label: usize,
-        predicate: Option<Predicate>,
+        predicate: Predicate,
         next: Box<Self>,
     },
     Choice {
         direction: Direction,
         role: usize,
         node: usize,
-        predicate: Option<Predicate>,
+        predicate: Predicate,
     },
 }
 
@@ -80,38 +81,40 @@ impl<'a> TypeFormatter<'a> {
         &self.role.nodes[*node]
     }
 
-    fn taut(&self, predicate: &Option<Predicate>) -> String {
-        if let Some(pred) = predicate {
-            match pred {
-                Predicate::LTnVar(a, _) => {
-                    let mut taut = String::from("LTnVar<Value, '");
-                    taut = taut + a.as_str();
-                    taut = taut + "', 'y'>";
-                    return taut;
-                }
-                Predicate::GTnVar(a, _) => {
-                    let mut taut = String::from("GTnVar<Value, '");
-                    taut = taut + a.as_str();
-                    taut = taut + "', 'y'>";
-                    return taut;
-                }
+    fn pred(&self, predicate: &Predicate) -> String {
+        match predicate {
+            Predicate::LTnConst(param, value) => {
+                let mut pred = String::from("LTnConst<Value, '");
+                pred = pred + param.as_str();
+                pred = pred + "', '";
+                pred = pred + value;
+                pred = pred + "'>";
+                return pred;
             }
+            Predicate::GTnConst(param, value) => {
+                let mut pred = String::from("GTnConst<Value, '");
+                pred = pred + param.as_str();
+                pred = pred + "', '";
+                pred = pred + value;
+                pred = pred + "'>";
+                return pred;
+            }
+            Predicate::None => (),
         }
         return "Tautology<Name, Value>".to_string();
     }
 
-    fn effect(&self, predicate: &Option<Predicate>) -> String {
-        if let Some(pred) = predicate {
-            match pred {
-                Predicate::LTnVar(_, _) => {
-                    let effect = String::from("Constant<Name, Value>");
-                    return effect;
-                }
-                Predicate::GTnVar(_, _) => {
-                    let effect = String::from("Constant<Name, Value>");
-                    return effect;
-                }
+    fn effect(&self, predicate: &Predicate) -> String {
+        match predicate {
+            Predicate::LTnConst(_, _) => {
+                let effect = String::from("Constant<Name, Value>");
+                return effect;
             }
+            Predicate::GTnConst(_, _) => {
+                let effect = String::from("Constant<Name, Value>");
+                return effect;
+            }
+            Predicate::None => (),
         }
         return "Constant<Name, Value>".to_string();
     }
@@ -132,10 +135,10 @@ impl Display for TypeFormatter<'_> {
                 predicate,
                 next,
             } => {
-                let (other, label, taut, effect, next) = (
+                let (other, label, pred, effect, next) = (
                     self.role(role),
                     self.label(label),
-                    self.taut(predicate),
+                    self.pred(predicate),
                     self.effect(predicate),
                     self.with(next),
                 );
@@ -143,12 +146,12 @@ impl Display for TypeFormatter<'_> {
                     Direction::Send => write!(
                         f,
                         "Send<{}, {}, {}, {}, {}>",
-                        other, label, taut, effect, next
+                        other, label, pred, effect, next
                     ),
                     Direction::Receive => write!(
                         f,
                         "Receive<{}, {}, {}, {}, {}>",
-                        other, label, taut, effect, next
+                        other, label, pred, effect, next
                     ),
                 }
             }
@@ -159,12 +162,12 @@ impl Display for TypeFormatter<'_> {
                 predicate,
             } => {
                 let other = self.role(role);
-                let (other, name, role, node, taut, effect) = (
+                let (other, name, role, node, pred, effect) = (
                     self.role(role),
                     self.name,
                     &self.role.camel,
                     self.node(node),
-                    self.taut(predicate),
+                    self.pred(predicate),
                     self.effect(predicate),
                 );
                 match direction {
@@ -172,14 +175,14 @@ impl Display for TypeFormatter<'_> {
                         write!(
                             f,
                             "Select<{}, {}, {}, {}{}{}>",
-                            other, taut, effect, name, role, node
+                            other, pred, effect, name, role, node
                         )
                     }
                     Direction::Receive => {
                         write!(
                             f,
                             "Branch<{}, {}, {}, {}{}{}>",
-                            other, taut, effect, name, role, node
+                            other, pred, effect, name, role, node
                         )
                     }
                 }
