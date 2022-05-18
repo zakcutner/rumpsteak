@@ -13,7 +13,7 @@ use petgraph::{
     graph::{node_index, NodeIndex},
     visit::{EdgeRef, IntoNodeReferences, VisitMap, Visitable},
 };
-use std::{error::Error, fs, io, path::Path, result, str};
+use std::{error::Error, fs, io, marker::PhantomData, path::Path, result, str};
 
 type Result<T, E = Box<dyn Error>> = result::Result<T, E>;
 
@@ -46,12 +46,17 @@ impl<'a> GraphNode<'a> {
 #[derive(Debug)]
 struct GraphEdge<'a> {
     label: usize,
-    predicate: Option<&'a str>,
+    predicate: Predicate,
+    _marker: PhantomData<&'a usize>,
 }
 
 impl<'a> GraphEdge<'a> {
-    fn new(label: usize, predicate: Option<&'a str>) -> Self {
-        Self { label, predicate }
+    fn new(label: usize, predicate: Predicate) -> Self {
+        Self {
+            label,
+            predicate,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -175,7 +180,7 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
                 self.visited.visit(node);
 
                 let (next, safe) = self.visit(edge.target());
-                let predicate = parse_expr(edge.weight().predicate);
+                let predicate = edge.weight().predicate.clone();
                 let ty = Type::Message {
                     direction: weight.direction.unwrap(),
                     role: weight.role.unwrap(),
@@ -199,7 +204,7 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
                 direction: weight.direction.unwrap(),
                 role: weight.role.unwrap(),
                 node: node.index(),
-                predicate: None,
+                predicate: Predicate::None,
             };
 
             if self.visited.is_visited(&node) {
@@ -267,41 +272,4 @@ fn generate_label((label, parameters): (&&str, &Vec<(&str, &str)>)) -> Label {
 
 fn generate_labels(labels: &IndexMap<&str, Vec<(&str, &str)>>) -> Vec<Label> {
     labels.iter().map(generate_label).collect()
-}
-
-fn parse_expr(pred: Option<&str>) -> Option<Predicate> {
-    if pred.is_none() {
-        return None;
-    }
-
-    let items: Vec<_> = pred
-        .unwrap()
-        .as_bytes()
-        .chunks(1)
-        .map(str::from_utf8)
-        .collect::<Result<Vec<&str>, _>>()
-        .unwrap();
-    if items.len() < 3 {
-        eprintln!("Incorrect refinement format: {:#?}", pred.unwrap());
-        return None;
-    }
-
-    match items[1] {
-        "<" => {
-            return Some(Predicate::LTnVar(
-                items[0].to_string(),
-                items[2].to_string(),
-            ))
-        }
-        ">" => {
-            return Some(Predicate::GTnVar(
-                items[0].to_string(),
-                items[2].to_string(),
-            ))
-        }
-        _ => {
-            eprintln!("Unsupported refinement type");
-            return None;
-        }
-    }
 }

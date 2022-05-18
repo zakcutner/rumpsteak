@@ -8,7 +8,9 @@ ident = { quoted_ident | raw_ident }
 send = { "!" }
 receive = { "?" }
 
-predicate = { ident ~ ("<" | ">") ~ ident }
+ltn = { "<" }
+gtn = { ">" }
+predicate = { ident ~ (ltn | gtn) ~ ident }
 
 param = { ident ~ ":" ~ ident }
 parameters = { (param ~ ",")* ~ param? }
