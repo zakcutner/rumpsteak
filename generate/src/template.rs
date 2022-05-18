@@ -17,6 +17,12 @@ pub(crate) enum Predicate {
     None,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) enum SideEffect {
+    Increase(String, String),
+    None,
+}
+
 #[derive(Debug)]
 pub(crate) enum Type {
     End,
@@ -26,6 +32,7 @@ pub(crate) enum Type {
         role: usize,
         label: usize,
         predicate: Predicate,
+        side_effect: SideEffect,
         next: Box<Self>,
     },
     Choice {
@@ -33,6 +40,7 @@ pub(crate) enum Type {
         role: usize,
         node: usize,
         predicate: Predicate,
+        side_effect: SideEffect,
     },
 }
 
@@ -45,6 +53,7 @@ impl Type {
                 role: _,
                 node: _,
                 predicate: _,
+                side_effect: _,
             }
         )
     }
@@ -104,17 +113,17 @@ impl<'a> TypeFormatter<'a> {
         return "Tautology<Name, Value>".to_string();
     }
 
-    fn effect(&self, predicate: &Predicate) -> String {
-        match predicate {
-            Predicate::LTnConst(_, _) => {
-                let effect = String::from("Constant<Name, Value>");
+    fn effect(&self, side_effect: &SideEffect) -> String {
+        match side_effect {
+            SideEffect::Increase(param, value) => {
+                let mut effect = String::from("Incr<'");
+                effect = effect + param;
+                effect = effect + "', ";
+                effect = effect + value;
+                effect = effect + ">";
                 return effect;
             }
-            Predicate::GTnConst(_, _) => {
-                let effect = String::from("Constant<Name, Value>");
-                return effect;
-            }
-            Predicate::None => (),
+            SideEffect::None => (),
         }
         return "Constant<Name, Value>".to_string();
     }
@@ -133,13 +142,14 @@ impl Display for TypeFormatter<'_> {
                 role,
                 label,
                 predicate,
+                side_effect,
                 next,
             } => {
                 let (other, label, pred, effect, next) = (
                     self.role(role),
                     self.label(label),
                     self.pred(predicate),
-                    self.effect(predicate),
+                    self.effect(side_effect),
                     self.with(next),
                 );
                 match direction {
@@ -160,6 +170,7 @@ impl Display for TypeFormatter<'_> {
                 role,
                 node,
                 predicate,
+                side_effect,
             } => {
                 let other = self.role(role);
                 let (other, name, role, node, pred, effect) = (
@@ -168,7 +179,7 @@ impl Display for TypeFormatter<'_> {
                     &self.role.camel,
                     self.node(node),
                     self.pred(predicate),
-                    self.effect(predicate),
+                    self.effect(side_effect),
                 );
                 match direction {
                     Direction::Send => {
