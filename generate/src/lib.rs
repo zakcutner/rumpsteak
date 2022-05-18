@@ -5,7 +5,9 @@ pub use self::template::Protocol;
 
 use self::{
     parser::Tree,
-    template::{Choice, Definition, DefinitionBody, Label, Predicate, Role, Route, Type},
+    template::{
+        Choice, Definition, DefinitionBody, Label, Predicate, Role, Route, SideEffect, Type,
+    },
 };
 use heck::{CamelCase, SnakeCase};
 use indexmap::IndexMap;
@@ -47,14 +49,16 @@ impl<'a> GraphNode<'a> {
 struct GraphEdge<'a> {
     label: usize,
     predicate: Predicate,
+    side_effect: SideEffect,
     _marker: PhantomData<&'a usize>,
 }
 
 impl<'a> GraphEdge<'a> {
-    fn new(label: usize, predicate: Predicate) -> Self {
+    fn new(label: usize, predicate: Predicate, side_effect: SideEffect) -> Self {
         Self {
             label,
             predicate,
+            side_effect,
             _marker: PhantomData,
         }
     }
@@ -181,11 +185,13 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
 
                 let (next, safe) = self.visit(edge.target());
                 let predicate = edge.weight().predicate.clone();
+                let side_effect = edge.weight().side_effect.clone();
                 let ty = Type::Message {
                     direction: weight.direction.unwrap(),
                     role: weight.role.unwrap(),
                     label: edge.weight().label,
                     predicate: predicate,
+                    side_effect: side_effect,
                     next: next.into(),
                 };
 
@@ -205,6 +211,7 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
                 role: weight.role.unwrap(),
                 node: node.index(),
                 predicate: Predicate::None,
+                side_effect: SideEffect::None,
             };
 
             if self.visited.is_visited(&node) {

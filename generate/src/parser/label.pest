@@ -12,8 +12,14 @@ ltn = { "<" }
 gtn = { ">" }
 predicate = { ident ~ (ltn | gtn) ~ ident }
 
+incr = { "+" }
+side_effect = { ident ~ "=" ~ ident ~ incr ~ ident }
+
 param = { ident ~ ":" ~ ident }
 parameters = { (param ~ ",")* ~ param? }
-label = { "\""? ~ ident ~ (send | receive) ~ ident ~ "(" ~ parameters ~ ")" ~ "\"" }
+label = { "\""? ~ ident ~ (send | receive) ~ ident ~ "(" ~ parameters ~ ")" ~ ( ":" ~ predicate)? ~ ( ":" ~ side_effect)? ~ "\"" }
 
-WHITESPACE = _{ " " }
+
+ltn_bk = { "<" ~ ident }
+gtn_bk = { ">" ~ ident }
+predicate_bk = { ident ~ (ltn_bk | gtn_bk) }
