@@ -1,0 +1,119 @@
+Graph {
+    strict: false,
+    is_digraph: true,
+    name: Some(
+        "G",
+    ),
+    attr: [],
+    nodes: NodeSet {
+        set: {
+            "5": Node {
+                id: "5",
+                port: None,
+                attr: AList {
+                    elems: [],
+                    _p: PhantomData,
+                },
+            },
+            "0": Node {
+                id: "0",
+                port: None,
+                attr: AList {
+                    elems: [],
+                    _p: PhantomData,
+                },
+            },
+            "1": Node {
+                id: "1",
+                port: None,
+                attr: AList {
+                    elems: [],
+                    _p: PhantomData,
+                },
+            },
+            "3": Node {
+                id: "3",
+                port: None,
+                attr: AList {
+                    elems: [],
+                    _p: PhantomData,
+                },
+            },
+        },
+    },
+    edges: EdgeSet {
+        set: [
+            Edge {
+                from: "0",
+                to: "1",
+                attr: AList {
+                    elems: [
+                        Edge {
+                            from: "1",
+                            to: "2",
+                            sender: "A",
+                            direction: Send,
+                            receiver: "C",
+                            payload: "empty1",
+                            parameters: [
+                                (
+                                    "x",
+                                    "u32",
+                                ),
+                            ],
+                            predicate: Some(
+                                "x<10",
+                            ),
+                        },
+                    ],
+                    _p: PhantomData,
+                },
+            },
+            Edge {
+                from: "1",
+                to: "3",
+                attr: AList {
+                    elems: [
+                        Edge {
+                            from: "1",
+                            to: "2",
+                            sender: "A",
+                            direction: Send,
+                            receiver: "C",
+                            payload: "valid",
+                            parameters: [
+                                (
+                                    "y",
+                                    "u32",
+                                ),
+                            ],
+                            predicate: Some(
+                                "y<20",
+                            ),
+                        },
+                    ],
+                    _p: PhantomData,
+                },
+            },
+            Edge {
+                from: "1",
+                to: "5",
+                attr: AList {
+                    elems: [
+                        Edge {
+                            from: "1",
+                            to: "2",
+                            sender: "A",
+                            direction: Send,
+                            receiver: "C",
+                            payload: "quit",
+                            parameters: [],
+                            predicate: None,
+                        },
+                    ],
+                    _p: PhantomData,
+                },
+            },
+        ],
+    },
+} 

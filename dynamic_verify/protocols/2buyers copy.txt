@@ -1,0 +1,11 @@
+digraph G {
+  0;
+  1;
+  3;
+  5;
+  
+  
+  0 -> 1 [label="A!C empty1(x:u32):x<10",];
+  1 -> 3 [label="A!C valid(y:u32):y<x", ];
+  1 -> 5 [label="A!C quit()", ];
+  }
