@@ -1,0 +1,7 @@
+digraph G {
+  0;
+  1;
+
+  0 -> 1 [label="S!C max_retry(x:i32):x<10", ];
+  1 -> 2 [label="S!C failure(y:i32):y<x", ];
+}

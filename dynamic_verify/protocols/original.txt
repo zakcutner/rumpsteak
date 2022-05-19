@@ -1,0 +1,9 @@
+digraph C {
+        0;
+        4;
+        
+        
+        0 -> 0 [label="S!A start(x:i32):x<10:x=x+1", ];
+        0 -> 4 [label="S!A stop(x:i32)", color=red ];
+        
+        }

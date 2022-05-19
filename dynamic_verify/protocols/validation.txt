@@ -1,0 +1,11 @@
+digraph G {
+  0;
+  2;
+  4;
+  
+  
+  0 -> 2 [label="C!S password(n:u32)", ];
+  2 -> 0 [label="S!C failure(x:u32):x<10", ];
+  2 -> 4 [label="S!C success(x:u32)", ];
+  
+  }
