@@ -16,6 +16,10 @@ pub(crate) enum Predicate {
     LTnConst(String, String),
     GTnVar(String, String),
     GTnConst(String, String),
+    EqualVar(String, String),
+    EqualConst(String, String),
+    LTnThree(String, String, String),
+    GTnThree(String, String, String),
     None,
 }
 
@@ -124,6 +128,42 @@ impl<'a> TypeFormatter<'a> {
                 pred = pred + "', ";
                 pred = pred + value;
                 pred = pred + ">";
+                return pred;
+            }
+            Predicate::EqualVar(param, value) => {
+                let mut pred = String::from("EqualVar<Value, '");
+                pred = pred + param.as_str();
+                pred = pred + "', '";
+                pred = pred + value;
+                pred = pred + "'>";
+                return pred;
+            }
+            Predicate::EqualConst(param, value) => {
+                let mut pred = String::from("EqualConst<Value, '");
+                pred = pred + param.as_str();
+                pred = pred + "', ";
+                pred = pred + value;
+                pred = pred + ">";
+                return pred;
+            }
+            Predicate::LTnThree(param, value1, value2) => {
+                let mut pred = String::from("LTnThreeVar<Value, '");
+                pred = pred + param.as_str();
+                pred = pred + "', '";
+                pred = pred + value1;
+                pred = pred + "', '";
+                pred = pred + value2;
+                pred = pred + "'>";
+                return pred;
+            }
+            Predicate::GTnThree(param, value1, value2) => {
+                let mut pred = String::from("GTnThreeVar<Value, '");
+                pred = pred + param.as_str();
+                pred = pred + "', '";
+                pred = pred + value1;
+                pred = pred + "', '";
+                pred = pred + value2;
+                pred = pred + "'>";
                 return pred;
             }
             Predicate::None => (),
