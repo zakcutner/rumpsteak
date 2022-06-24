@@ -47,3 +47,60 @@ impl<const NAME: char, const VALUE: i32> SideEffect for Incr<NAME, VALUE> {
         m.get_mut(&NAME).map(|ref_v| (*ref_v) += VALUE);
     }
 }
+
+pub struct Decr<const NAME: char, const VALUE: i32> {
+    _p: PhantomData<()>,
+}
+
+impl<const NAME: char, const VALUE: i32> Default for Decr<NAME, VALUE> {
+    fn default() -> Self {
+        Decr { _p: PhantomData }
+    }
+}
+
+impl<const NAME: char, const VALUE: i32> SideEffect for Decr<NAME, VALUE> {
+    type Name = char;
+    type Value = i32;
+
+    fn side_effect(&mut self, m: &mut HashMap<Self::Name, Self::Value>) {
+        m.get_mut(&NAME).map(|ref_v| (*ref_v) -= VALUE);
+    }
+}
+
+pub struct Mult<const NAME: char, const VALUE: i32> {
+    _p: PhantomData<()>,
+}
+
+impl<const NAME: char, const VALUE: i32> Default for Mult<NAME, VALUE> {
+    fn default() -> Self {
+        Mult { _p: PhantomData }
+    }
+}
+
+impl<const NAME: char, const VALUE: i32> SideEffect for Mult<NAME, VALUE> {
+    type Name = char;
+    type Value = i32;
+
+    fn side_effect(&mut self, m: &mut HashMap<Self::Name, Self::Value>) {
+        m.get_mut(&NAME).map(|ref_v| (*ref_v) *= VALUE);
+    }
+}
+
+pub struct Div<const NAME: char, const VALUE: i32> {
+    _p: PhantomData<()>,
+}
+
+impl<const NAME: char, const VALUE: i32> Default for Div<NAME, VALUE> {
+    fn default() -> Self {
+        Div { _p: PhantomData }
+    }
+}
+
+impl<const NAME: char, const VALUE: i32> SideEffect for Div<NAME, VALUE> {
+    type Name = char;
+    type Value = i32;
+
+    fn side_effect(&mut self, m: &mut HashMap<Self::Name, Self::Value>) {
+        m.get_mut(&NAME).map(|ref_v| (*ref_v) -= VALUE);
+    }
+}

@@ -35,6 +35,9 @@ pub(in crate) enum BoolPredicate {
 #[derive(Clone, Debug)]
 pub(crate) enum SideEffect {
     Increase(String, String),
+    Decrease(String, String),
+    Multiply(String, String),
+    Divide(String, String),
     None,
 }
 
@@ -216,6 +219,30 @@ impl<'a> TypeFormatter<'a> {
         match side_effect {
             SideEffect::Increase(param, value) => {
                 let mut effect = String::from("Incr<'");
+                effect = effect + param;
+                effect = effect + "', ";
+                effect = effect + value;
+                effect = effect + ">";
+                return effect;
+            }
+            SideEffect::Decrease(param, value) => {
+                let mut effect = String::from("Decr<'");
+                effect = effect + param;
+                effect = effect + "', ";
+                effect = effect + value;
+                effect = effect + ">";
+                return effect;
+            }
+            SideEffect::Multiply(param, value) => {
+                let mut effect = String::from("Mult<'");
+                effect = effect + param;
+                effect = effect + "', ";
+                effect = effect + value;
+                effect = effect + ">";
+                return effect;
+            }
+            SideEffect::Divide(param, value) => {
+                let mut effect = String::from("Div<'");
                 effect = effect + param;
                 effect = effect + "', ";
                 effect = effect + value;
