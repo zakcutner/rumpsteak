@@ -10,7 +10,10 @@ receive = { "?" }
 
 ltn = { "<" }
 gtn = { ">" }
-predicate = { ident ~ (ltn | gtn) ~ ident }
+eq = { "==" }
+basic_op = { ident ~ (ltn | gtn | eq) ~ ident }
+compthree = { ident ~ (ltn | gtn ) ~ ident ~ (ltn | gtn ) ~ ident }
+predicate = { compthree | basic_op}
 
 incr = { "+" }
 side_effect = { ident ~ "=" ~ ident ~ incr ~ ident }

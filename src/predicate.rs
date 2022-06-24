@@ -193,6 +193,148 @@ impl<L, const LHS: char, const RHS: i32> Predicate for GTnConst<L, LHS, RHS> {
     }
 }
 
+/// The `EqualVar` struct implements an operator (equal to a variable).
+pub struct EqualVar<V: Ord, L, const LHS: char, const RHS: char> {
+    _p: PhantomData<(V, L)>,
+}
+
+impl<L, V: Ord, const LHS: char, const RHS: char> Default for EqualVar<V, L, LHS, RHS> {
+    fn default() -> Self {
+        Self { _p: PhantomData }
+    }
+}
+
+impl<L, V: Ord, const LHS: char, const RHS: char> Predicate for EqualVar<V, L, LHS, RHS>
+where
+    V: std::cmp::Ord,
+{
+    type Name = char;
+    type Value = V;
+    type Label = L;
+    type Error = ();
+
+    fn check(
+        &self,
+        m: &HashMap<Self::Name, Self::Value>,
+        _l: Option<&Self::Label>,
+    ) -> Result<(), Self::Error> {
+        let lhs = m.get(&LHS).ok_or(())?;
+        let rhs = m.get(&RHS).ok_or(())?;
+        if lhs == rhs {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
+/// The `EqualConst` struct implements an operator (equal to a value).
+pub struct EqualConst<L, const LHS: char, const RHS: i32> {}
+
+impl<L, const LHS: char, const RHS: i32> Default for EqualConst<L, LHS, RHS> {
+    fn default() -> Self {
+        Self {}
+    }
+}
+
+impl<L, const LHS: char, const RHS: i32> Predicate for EqualConst<L, LHS, RHS> {
+    type Name = char;
+    type Value = i32;
+    type Label = L;
+    type Error = ();
+
+    fn check(
+        &self,
+        m: &HashMap<Self::Name, Self::Value>,
+        _l: Option<&Self::Label>,
+    ) -> Result<(), Self::Error> {
+        let lhs = m.get(&LHS).ok_or(())?;
+        if lhs == &RHS {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
+/// The `LTnThree` struct implements an operator (less than between three operands).
+pub struct LTnThree<V: Ord, L, const LHS: char, const MID: char, const RHS: char> {
+    _p: PhantomData<(V, L)>,
+}
+
+impl<L, V: Ord, const LHS: char, const MID: char, const RHS: char> Default
+    for LTnThree<V, L, LHS, MID, RHS>
+{
+    fn default() -> Self {
+        Self { _p: PhantomData }
+    }
+}
+
+impl<L, V: Ord, const LHS: char, const MID: char, const RHS: char> Predicate
+    for LTnThree<V, L, LHS, MID, RHS>
+where
+    V: std::cmp::Ord,
+{
+    type Name = char;
+    type Value = V;
+    type Label = L;
+    type Error = ();
+
+    fn check(
+        &self,
+        m: &HashMap<Self::Name, Self::Value>,
+        _l: Option<&Self::Label>,
+    ) -> Result<(), Self::Error> {
+        let lhs = m.get(&LHS).ok_or(())?;
+        let mid = m.get(&MID).ok_or(())?;
+        let rhs = m.get(&RHS).ok_or(())?;
+        if lhs < mid && mid < rhs {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
+/// The `GTnThree` struct implements an operator (greater than between three operands).
+pub struct GTnThree<V: Ord, L, const LHS: char, const MID: char, const RHS: char> {
+    _p: PhantomData<(V, L)>,
+}
+
+impl<L, V: Ord, const LHS: char, const MID: char, const RHS: char> Default
+    for GTnThree<V, L, LHS, MID, RHS>
+{
+    fn default() -> Self {
+        Self { _p: PhantomData }
+    }
+}
+
+impl<L, V: Ord, const LHS: char, const MID: char, const RHS: char> Predicate
+    for GTnThree<V, L, LHS, MID, RHS>
+where
+    V: std::cmp::Ord,
+{
+    type Name = char;
+    type Value = V;
+    type Label = L;
+    type Error = ();
+
+    fn check(
+        &self,
+        m: &HashMap<Self::Name, Self::Value>,
+        _l: Option<&Self::Label>,
+    ) -> Result<(), Self::Error> {
+        let lhs = m.get(&LHS).ok_or(())?;
+        let mid = m.get(&MID).ok_or(())?;
+        let rhs = m.get(&RHS).ok_or(())?;
+        if lhs > mid && mid > rhs {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
 pub struct LTn<N, V> {
     lhs: N,
     rhs: N,

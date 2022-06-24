@@ -329,6 +329,10 @@ mod label {
         LTnConst(&'a str, &'a str),
         GTnVar(&'a str, &'a str),
         GTnConst(&'a str, &'a str),
+        EqualVar(&'a str, &'a str),
+        EqualConst(&'a str, &'a str),
+        LTnThree(&'a str, &'a str, &'a str),
+        GTnThree(&'a str, &'a str, &'a str),
         None,
     }
 
@@ -346,6 +350,18 @@ mod label {
                 }
                 Predicate::GTnConst(a, b) => {
                     super::super::Predicate::GTnConst(a.to_string(), b.to_string())
+                }
+                Predicate::EqualVar(a, b) => {
+                    super::super::Predicate::EqualVar(a.to_string(), b.to_string())
+                }
+                Predicate::EqualConst(a, b) => {
+                    super::super::Predicate::EqualConst(a.to_string(), b.to_string())
+                }
+                Predicate::LTnThree(a, b, c) => {
+                    super::super::Predicate::LTnThree(a.to_string(), b.to_string(), c.to_string())
+                }
+                Predicate::GTnThree(a, b, c) => {
+                    super::super::Predicate::GTnThree(a.to_string(), b.to_string(), c.to_string())
                 }
                 Predicate::None => super::super::Predicate::None,
             }
@@ -405,28 +421,63 @@ mod label {
                     match p.as_rule() {
                         Rule::predicate => {
                             let mut inner = p.clone().into_inner();
-                            let param = inner.next().unwrap().as_str();
-                            let op = inner.next().unwrap();
-                            let value = inner.next().unwrap().as_str();
-                            let first_char = value.chars().nth(0).unwrap();
-                            match op.as_rule() {
-                                Rule::ltn => {
-                                    // check is the second operand is a number
-                                    if first_char.is_digit(10) {
-                                        predicate = Predicate::LTnConst(param, value);
-                                    } else {
-                                        predicate = Predicate::LTnVar(param, value);
+                            if let Some(p) = inner.next() {
+                                match p.as_rule() {
+                                    Rule::basic_op => {
+                                        let mut inner = p.clone().into_inner();
+                                        let param = inner.next().unwrap().as_str();
+                                        let op = inner.next().unwrap();
+                                        let value = inner.next().unwrap().as_str();
+                                        let first_char = value.chars().nth(0).unwrap();
+                                        match op.as_rule() {
+                                            Rule::ltn => {
+                                                // check is the second operand is a number
+                                                if first_char.is_digit(10) {
+                                                    predicate = Predicate::LTnConst(param, value);
+                                                } else {
+                                                    predicate = Predicate::LTnVar(param, value);
+                                                }
+                                            }
+                                            Rule::gtn => {
+                                                // check is the second operand is a number
+                                                if first_char.is_digit(10) {
+                                                    predicate = Predicate::GTnConst(param, value);
+                                                } else {
+                                                    predicate = Predicate::GTnVar(param, value);
+                                                }
+                                            }
+                                            Rule::eq => {
+                                                // check is the second operand is a number
+                                                if first_char.is_digit(10) {
+                                                    predicate = Predicate::EqualConst(param, value);
+                                                } else {
+                                                    predicate = Predicate::EqualVar(param, value);
+                                                }
+                                            }
+                                            _ => (),
+                                        }
                                     }
-                                }
-                                Rule::gtn => {
-                                    // check is the second operand is a number
-                                    if first_char.is_digit(10) {
-                                        predicate = Predicate::GTnConst(param, value);
-                                    } else {
-                                        predicate = Predicate::GTnVar(param, value);
+                                    Rule::compthree => {
+                                        let mut inner = p.clone().into_inner();
+                                        let param = inner.next().unwrap().as_str();
+                                        let op = inner.next().unwrap();
+                                        let value1 = inner.next().unwrap().as_str();
+                                        let op = inner.next().unwrap();
+                                        let value2 = inner.next().unwrap().as_str();
+                                        match op.as_rule() {
+                                            Rule::ltn => {
+                                                predicate =
+                                                    Predicate::LTnThree(param, value1, value2)
+                                            }
+                                            Rule::gtn => {
+                                                predicate =
+                                                    Predicate::GTnThree(param, value1, value2)
+                                            }
+                                            _ => (),
+                                        }
                                     }
+                                    _ => (),
                                 }
-                                _ => (),
                             }
                         }
                         Rule::side_effect => {
