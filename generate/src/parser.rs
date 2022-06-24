@@ -368,6 +368,149 @@ mod label {
         }
     }
 
+    impl<'a> Predicate<'a> {
+        pub(in crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
+            eprintln!("here2");
+            if let p = p {
+                eprintln!("here3");
+                eprintln!("{:#?}", p);
+                match p.as_rule() {
+                    Rule::op => {
+                        eprintln!("here1");
+                        let mut inner = p.clone().into_inner();
+                        let param = inner.next().unwrap().as_str();
+                        let op = inner.next().unwrap();
+                        let value = inner.next().unwrap().as_str();
+                        let first_char = value.chars().nth(0).unwrap();
+                        match op.as_rule() {
+                            Rule::ltn => {
+                                // check is the second operand is a number
+                                if first_char.is_digit(10) {
+                                    Ok(Predicate::LTnConst(param, value))
+                                } else {
+                                    Ok(Predicate::LTnVar(param, value))
+                                }
+                            }
+                            Rule::gtn => {
+                                // check is the second operand is a number
+                                if first_char.is_digit(10) {
+                                    Ok(Predicate::GTnConst(param, value))
+                                } else {
+                                    Ok(Predicate::GTnVar(param, value))
+                                }
+                            }
+                            Rule::eq => {
+                                // check is the second operand is a number
+                                if first_char.is_digit(10) {
+                                    Ok(Predicate::EqualConst(param, value))
+                                } else {
+                                    Ok(Predicate::EqualVar(param, value))
+                                }
+                            }
+                            _ => Err(()),
+                        }
+                    }
+                    Rule::compthree => {
+                        let mut inner = p.clone().into_inner();
+                        let param = inner.next().unwrap().as_str();
+                        let op = inner.next().unwrap();
+                        let value1 = inner.next().unwrap().as_str();
+                        let op = inner.next().unwrap();
+                        let value2 = inner.next().unwrap().as_str();
+                        match op.as_rule() {
+                            Rule::ltn => Ok(Predicate::LTnThree(param, value1, value2)),
+                            Rule::gtn => Ok(Predicate::GTnThree(param, value1, value2)),
+                            _ => Err(()),
+                        }
+                    }
+                    _ => Err(()),
+                }
+            } else {
+                return Err(());
+            }
+        }
+    }
+
+    #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
+    pub(in crate) enum BoolPredicate<'a> {
+        Normal(Predicate<'a>),
+        And(Predicate<'a>, Predicate<'a>),
+        Or(Predicate<'a>, Predicate<'a>),
+        Neg(Predicate<'a>),
+        None,
+    }
+
+    impl<'a> BoolPredicate<'a> {
+        pub(in crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
+            eprintln!("here00");
+            if let p = p {
+                match p.as_rule() {
+                    Rule::basic => {
+                        let mut inner = p.clone().into_inner();
+                        let pred = if let Some(p) = inner.next() {
+                            Predicate::parse(p).unwrap()
+                        } else {
+                            Predicate::None
+                        };
+                        return Ok(BoolPredicate::Normal(pred));
+                    }
+                    Rule::bool_op => {
+                        let mut inner = p.clone().into_inner();
+                        let pred1 = if let Some(p) = inner.next() {
+                            Predicate::parse(p).unwrap()
+                        } else {
+                            Predicate::None
+                        };
+
+                        let op = inner.next().unwrap();
+                        let pred2 = if let Some(p) = inner.next() {
+                            Predicate::parse(p).unwrap()
+                        } else {
+                            eprintln!("dddd");
+                            Predicate::None
+                        };
+                        return match op.as_rule() {
+                            Rule::and => Ok(BoolPredicate::And(pred1, pred2)),
+                            Rule::or => Ok(BoolPredicate::Or(pred1, pred2)),
+                            _ => Err(()),
+                        };
+                    }
+                    Rule::neg_op => {
+                        let mut inner = p.clone().into_inner();
+                        let op = inner.next().unwrap();
+                        let pred = if let Some(p) = inner.next() {
+                            Predicate::parse(p).unwrap()
+                        } else {
+                            Predicate::None
+                        };
+                        return Ok(BoolPredicate::Neg(pred));
+                    }
+                    _ => {
+                        eprintln!("here02");
+                        return Err(());
+                    }
+                }
+            }
+            return Err(());
+        }
+    }
+
+    impl<'a> Into<super::super::BoolPredicate> for BoolPredicate<'a> {
+        fn into(self) -> super::super::BoolPredicate {
+            match self {
+                BoolPredicate::Normal(pred) => super::super::BoolPredicate::Normal(pred.into()),
+                BoolPredicate::And(pred1, pred2) => {
+                    super::super::BoolPredicate::And(pred1.into(), pred2.into())
+                }
+                BoolPredicate::Or(pred1, pred2) => {
+                    super::super::BoolPredicate::Or(pred1.into(), pred2.into())
+                }
+                BoolPredicate::Neg(pred) => super::super::BoolPredicate::Neg(pred.into()),
+                _ => super::super::BoolPredicate::None,
+            }
+        }
+    }
+
     #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
     pub(in crate) enum SideEffect<'a> {
         Increase(&'a str, &'a str),
@@ -391,7 +534,7 @@ mod label {
         pub(in crate) direction: Direction,
         pub(in crate) payload: &'a str,
         pub(in crate) parameters: Vec<(&'a str, &'a str)>, // (name, type)
-        pub(in crate) predicate: Predicate<'a>,
+        pub(in crate) predicate: BoolPredicate<'a>,
         pub(in crate) side_effect: SideEffect<'a>,
     }
 
@@ -415,69 +558,16 @@ mod label {
                         }
                     }
                 }
-                let mut predicate = Predicate::None;
+                let mut predicate = BoolPredicate::None;
                 let mut side_effect = SideEffect::None;
                 while let Some(p) = inner.next() {
                     match p.as_rule() {
                         Rule::predicate => {
-                            let mut inner = p.clone().into_inner();
-                            if let Some(p) = inner.next() {
-                                match p.as_rule() {
-                                    Rule::basic_op => {
-                                        let mut inner = p.clone().into_inner();
-                                        let param = inner.next().unwrap().as_str();
-                                        let op = inner.next().unwrap();
-                                        let value = inner.next().unwrap().as_str();
-                                        let first_char = value.chars().nth(0).unwrap();
-                                        match op.as_rule() {
-                                            Rule::ltn => {
-                                                // check is the second operand is a number
-                                                if first_char.is_digit(10) {
-                                                    predicate = Predicate::LTnConst(param, value);
-                                                } else {
-                                                    predicate = Predicate::LTnVar(param, value);
-                                                }
-                                            }
-                                            Rule::gtn => {
-                                                // check is the second operand is a number
-                                                if first_char.is_digit(10) {
-                                                    predicate = Predicate::GTnConst(param, value);
-                                                } else {
-                                                    predicate = Predicate::GTnVar(param, value);
-                                                }
-                                            }
-                                            Rule::eq => {
-                                                // check is the second operand is a number
-                                                if first_char.is_digit(10) {
-                                                    predicate = Predicate::EqualConst(param, value);
-                                                } else {
-                                                    predicate = Predicate::EqualVar(param, value);
-                                                }
-                                            }
-                                            _ => (),
-                                        }
-                                    }
-                                    Rule::compthree => {
-                                        let mut inner = p.clone().into_inner();
-                                        let param = inner.next().unwrap().as_str();
-                                        let op = inner.next().unwrap();
-                                        let value1 = inner.next().unwrap().as_str();
-                                        let op = inner.next().unwrap();
-                                        let value2 = inner.next().unwrap().as_str();
-                                        match op.as_rule() {
-                                            Rule::ltn => {
-                                                predicate =
-                                                    Predicate::LTnThree(param, value1, value2)
-                                            }
-                                            Rule::gtn => {
-                                                predicate =
-                                                    Predicate::GTnThree(param, value1, value2)
-                                            }
-                                            _ => (),
-                                        }
-                                    }
-                                    _ => (),
-                                }
+                            eprintln!("here0000");
+                            if let Some(p) = p.into_inner().next() {
+                                eprintln!("here000");
+                                predicate = BoolPredicate::parse(p).unwrap();
+                                eprintln!("{:#?}", predicate);
                             }
                         }
                         Rule::side_effect => {
@@ -523,7 +613,7 @@ mod label {
             Direction,
             &'a str,
             Vec<(&'a str, &'a str)>,
-            Predicate<'a>,
+            BoolPredicate<'a>,
             SideEffect<'a>,
         ) {
             (

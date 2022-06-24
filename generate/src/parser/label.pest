@@ -11,9 +11,15 @@ receive = { "?" }
 ltn = { "<" }
 gtn = { ">" }
 eq = { "==" }
-basic_op = { ident ~ (ltn | gtn | eq) ~ ident }
+and = { " and " }
+or = { " or " }
+neg = { "neg " }
+op = { ident ~ (ltn | gtn | eq) ~ ident }
 compthree = { ident ~ (ltn | gtn ) ~ ident ~ (ltn | gtn ) ~ ident }
-predicate = { compthree | basic_op}
+basic = { compthree | op }
+bool_op = { op ~ (and | or ) ~ op }
+neg_op = { neg ~ op }
+predicate = { neg_op | bool_op | basic }
 
 incr = { "+" }
 side_effect = { ident ~ "=" ~ ident ~ incr ~ ident }
