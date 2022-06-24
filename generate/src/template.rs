@@ -12,7 +12,9 @@ pub(crate) struct Route(pub usize);
 
 #[derive(Clone, Debug)]
 pub(crate) enum Predicate {
+    LTnVar(String, String),
     LTnConst(String, String),
+    GTnVar(String, String),
     GTnConst(String, String),
     None,
 }
@@ -92,8 +94,24 @@ impl<'a> TypeFormatter<'a> {
 
     fn pred(&self, predicate: &Predicate) -> String {
         match predicate {
+            Predicate::LTnVar(param, value) => {
+                let mut pred = String::from("LTnVar<Value, '");
+                pred = pred + param.as_str();
+                pred = pred + "', '";
+                pred = pred + value;
+                pred = pred + "'>";
+                return pred;
+            }
             Predicate::LTnConst(param, value) => {
                 let mut pred = String::from("LTnConst<Value, '");
+                pred = pred + param.as_str();
+                pred = pred + "', ";
+                pred = pred + value;
+                pred = pred + ">";
+                return pred;
+            }
+            Predicate::GTnVar(param, value) => {
+                let mut pred = String::from("GTnVar<Value, '");
                 pred = pred + param.as_str();
                 pred = pred + "', '";
                 pred = pred + value;
@@ -103,9 +121,9 @@ impl<'a> TypeFormatter<'a> {
             Predicate::GTnConst(param, value) => {
                 let mut pred = String::from("GTnConst<Value, '");
                 pred = pred + param.as_str();
-                pred = pred + "', '";
+                pred = pred + "', ";
                 pred = pred + value;
-                pred = pred + "'>";
+                pred = pred + ">";
                 return pred;
             }
             Predicate::None => (),
