@@ -325,7 +325,9 @@ mod label {
 
     #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
     pub(in crate) enum Predicate<'a> {
+        LTnVar(&'a str, &'a str),
         LTnConst(&'a str, &'a str),
+        GTnVar(&'a str, &'a str),
         GTnConst(&'a str, &'a str),
         None,
     }
@@ -333,8 +335,14 @@ mod label {
     impl<'a> Into<super::super::Predicate> for Predicate<'a> {
         fn into(self) -> super::super::Predicate {
             match self {
+                Predicate::LTnVar(a, b) => {
+                    super::super::Predicate::LTnVar(a.to_string(), b.to_string())
+                }
                 Predicate::LTnConst(a, b) => {
                     super::super::Predicate::LTnConst(a.to_string(), b.to_string())
+                }
+                Predicate::GTnVar(a, b) => {
+                    super::super::Predicate::GTnVar(a.to_string(), b.to_string())
                 }
                 Predicate::GTnConst(a, b) => {
                     super::super::Predicate::GTnConst(a.to_string(), b.to_string())
@@ -400,9 +408,24 @@ mod label {
                             let param = inner.next().unwrap().as_str();
                             let op = inner.next().unwrap();
                             let value = inner.next().unwrap().as_str();
+                            let first_char = value.chars().nth(0).unwrap();
                             match op.as_rule() {
-                                Rule::ltn => predicate = Predicate::LTnConst(param, value),
-                                Rule::gtn => predicate = Predicate::GTnConst(param, value),
+                                Rule::ltn => {
+                                    // check is the second operand is a number
+                                    if first_char.is_digit(10) {
+                                        predicate = Predicate::LTnConst(param, value);
+                                    } else {
+                                        predicate = Predicate::LTnVar(param, value);
+                                    }
+                                }
+                                Rule::gtn => {
+                                    // check is the second operand is a number
+                                    if first_char.is_digit(10) {
+                                        predicate = Predicate::GTnConst(param, value);
+                                    } else {
+                                        predicate = Predicate::GTnVar(param, value);
+                                    }
+                                }
                                 _ => (),
                             }
                         }

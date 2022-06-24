@@ -61,6 +61,7 @@ impl<N, V, L> Predicate for Tautology<N, V, L> {
     type Error = ();
 }
 
+/// The `LTnVar` struct implements an operator (less than a variable).
 pub struct LTnVar<V: Ord, L, const LHS: char, const RHS: char> {
     _p: PhantomData<(V, L)>,
 }
@@ -95,6 +96,38 @@ where
     }
 }
 
+/// The `LTnConst` struct implements an operator (less than a value).
+pub struct LTnConst<L, const LHS: char, const RHS: i32> {
+    _p: PhantomData<L>,
+}
+
+impl<L, const LHS: char, const RHS: i32> Default for LTnConst<L, LHS, RHS> {
+    fn default() -> Self {
+        Self { _p: PhantomData }
+    }
+}
+
+impl<L, const LHS: char, const RHS: i32> Predicate for LTnConst<L, LHS, RHS> {
+    type Name = char;
+    type Value = i32;
+    type Label = L;
+    type Error = ();
+
+    fn check(
+        &self,
+        m: &HashMap<Self::Name, Self::Value>,
+        _l: Option<&Self::Label>,
+    ) -> Result<(), Self::Error> {
+        let lhs: Self::Value = *m.get(&LHS).ok_or(())?;
+        if lhs < RHS {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
+/// The `GTnVar` struct implements an operator (greater than a variable).
 pub struct GTnVar<V: Ord, L, const LHS: char, const RHS: char> {
     _p: PhantomData<(V, L)>,
 }
@@ -129,17 +162,18 @@ where
     }
 }
 
-pub struct LTnConst<L, const LHS: char, const RHS: i32> {
+/// The `GTnConst` struct implements an operator (less than a value).
+pub struct GTnConst<L, const LHS: char, const RHS: i32> {
     _p: PhantomData<L>,
 }
 
-impl<L, const LHS: char, const RHS: i32> Default for LTnConst<L, LHS, RHS> {
+impl<L, const LHS: char, const RHS: i32> Default for GTnConst<L, LHS, RHS> {
     fn default() -> Self {
         Self { _p: PhantomData }
     }
 }
 
-impl<L, const LHS: char, const RHS: i32> Predicate for LTnConst<L, LHS, RHS> {
+impl<L, const LHS: char, const RHS: i32> Predicate for GTnConst<L, LHS, RHS> {
     type Name = char;
     type Value = i32;
     type Label = L;
@@ -151,7 +185,7 @@ impl<L, const LHS: char, const RHS: i32> Predicate for LTnConst<L, LHS, RHS> {
         _l: Option<&Self::Label>,
     ) -> Result<(), Self::Error> {
         let lhs: Self::Value = *m.get(&LHS).ok_or(())?;
-        if lhs < RHS {
+        if lhs > RHS {
             Ok(())
         } else {
             Err(())
