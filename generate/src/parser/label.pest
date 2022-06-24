@@ -22,7 +22,10 @@ neg_op = { neg ~ op }
 predicate = { neg_op | bool_op | basic }
 
 incr = { "+" }
-side_effect = { ident ~ "=" ~ ident ~ incr ~ ident }
+decr = { "-" }
+mult = { "*" }
+div = { "/" }
+side_effect = { ident ~ "=" ~ ident ~ ( incr | decr | mult | div ) ~ ident }
 
 param = { ident ~ ":" ~ ident }
 parameters = { (param ~ ",")* ~ param? }

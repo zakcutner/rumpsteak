@@ -1,7 +1,5 @@
 #![allow(clippy::upper_case_acronyms)]
 
-use crate::template::Predicate;
-
 use super::{Graph, GraphEdge, GraphNode, Result};
 use indexmap::{IndexMap, IndexSet};
 use std::{
@@ -370,63 +368,55 @@ mod label {
 
     impl<'a> Predicate<'a> {
         pub(in crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
-            eprintln!("here2");
-            if let p = p {
-                eprintln!("here3");
-                eprintln!("{:#?}", p);
-                match p.as_rule() {
-                    Rule::op => {
-                        eprintln!("here1");
-                        let mut inner = p.clone().into_inner();
-                        let param = inner.next().unwrap().as_str();
-                        let op = inner.next().unwrap();
-                        let value = inner.next().unwrap().as_str();
-                        let first_char = value.chars().nth(0).unwrap();
-                        match op.as_rule() {
-                            Rule::ltn => {
-                                // check is the second operand is a number
-                                if first_char.is_digit(10) {
-                                    Ok(Predicate::LTnConst(param, value))
-                                } else {
-                                    Ok(Predicate::LTnVar(param, value))
-                                }
+            match p.as_rule() {
+                Rule::op => {
+                    let mut inner = p.clone().into_inner();
+                    let param = inner.next().unwrap().as_str();
+                    let op = inner.next().unwrap();
+                    let value = inner.next().unwrap().as_str();
+                    let first_char = value.chars().nth(0).unwrap();
+                    match op.as_rule() {
+                        Rule::ltn => {
+                            // check is the second operand is a number
+                            if first_char.is_digit(10) {
+                                Ok(Predicate::LTnConst(param, value))
+                            } else {
+                                Ok(Predicate::LTnVar(param, value))
                             }
-                            Rule::gtn => {
-                                // check is the second operand is a number
-                                if first_char.is_digit(10) {
-                                    Ok(Predicate::GTnConst(param, value))
-                                } else {
-                                    Ok(Predicate::GTnVar(param, value))
-                                }
-                            }
-                            Rule::eq => {
-                                // check is the second operand is a number
-                                if first_char.is_digit(10) {
-                                    Ok(Predicate::EqualConst(param, value))
-                                } else {
-                                    Ok(Predicate::EqualVar(param, value))
-                                }
-                            }
-                            _ => Err(()),
                         }
-                    }
-                    Rule::compthree => {
-                        let mut inner = p.clone().into_inner();
-                        let param = inner.next().unwrap().as_str();
-                        let op = inner.next().unwrap();
-                        let value1 = inner.next().unwrap().as_str();
-                        let op = inner.next().unwrap();
-                        let value2 = inner.next().unwrap().as_str();
-                        match op.as_rule() {
-                            Rule::ltn => Ok(Predicate::LTnThree(param, value1, value2)),
-                            Rule::gtn => Ok(Predicate::GTnThree(param, value1, value2)),
-                            _ => Err(()),
+                        Rule::gtn => {
+                            // check is the second operand is a number
+                            if first_char.is_digit(10) {
+                                Ok(Predicate::GTnConst(param, value))
+                            } else {
+                                Ok(Predicate::GTnVar(param, value))
+                            }
                         }
+                        Rule::eq => {
+                            // check is the second operand is a number
+                            if first_char.is_digit(10) {
+                                Ok(Predicate::EqualConst(param, value))
+                            } else {
+                                Ok(Predicate::EqualVar(param, value))
+                            }
+                        }
+                        _ => Err(()),
                     }
-                    _ => Err(()),
                 }
-            } else {
-                return Err(());
+                Rule::compthree => {
+                    let mut inner = p.clone().into_inner();
+                    let param = inner.next().unwrap().as_str();
+                    let op = inner.next().unwrap();
+                    let value1 = inner.next().unwrap().as_str();
+                    let _ = inner.next().unwrap();
+                    let value2 = inner.next().unwrap().as_str();
+                    match op.as_rule() {
+                        Rule::ltn => Ok(Predicate::LTnThree(param, value1, value2)),
+                        Rule::gtn => Ok(Predicate::GTnThree(param, value1, value2)),
+                        _ => Err(()),
+                    }
+                }
+                _ => Err(()),
             }
         }
     }
@@ -442,56 +432,51 @@ mod label {
 
     impl<'a> BoolPredicate<'a> {
         pub(in crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
-            eprintln!("here00");
-            if let p = p {
-                match p.as_rule() {
-                    Rule::basic => {
-                        let mut inner = p.clone().into_inner();
-                        let pred = if let Some(p) = inner.next() {
-                            Predicate::parse(p).unwrap()
-                        } else {
-                            Predicate::None
-                        };
-                        return Ok(BoolPredicate::Normal(pred));
-                    }
-                    Rule::bool_op => {
-                        let mut inner = p.clone().into_inner();
-                        let pred1 = if let Some(p) = inner.next() {
-                            Predicate::parse(p).unwrap()
-                        } else {
-                            Predicate::None
-                        };
-
-                        let op = inner.next().unwrap();
-                        let pred2 = if let Some(p) = inner.next() {
-                            Predicate::parse(p).unwrap()
-                        } else {
-                            eprintln!("dddd");
-                            Predicate::None
-                        };
-                        return match op.as_rule() {
-                            Rule::and => Ok(BoolPredicate::And(pred1, pred2)),
-                            Rule::or => Ok(BoolPredicate::Or(pred1, pred2)),
-                            _ => Err(()),
-                        };
-                    }
-                    Rule::neg_op => {
-                        let mut inner = p.clone().into_inner();
-                        let op = inner.next().unwrap();
-                        let pred = if let Some(p) = inner.next() {
-                            Predicate::parse(p).unwrap()
-                        } else {
-                            Predicate::None
-                        };
-                        return Ok(BoolPredicate::Neg(pred));
-                    }
-                    _ => {
-                        eprintln!("here02");
-                        return Err(());
-                    }
+            match p.as_rule() {
+                Rule::basic => {
+                    let mut inner = p.clone().into_inner();
+                    let pred = if let Some(p) = inner.next() {
+                        Predicate::parse(p).unwrap()
+                    } else {
+                        Predicate::None
+                    };
+                    return Ok(BoolPredicate::Normal(pred));
                 }
+                Rule::bool_op => {
+                    let mut inner = p.clone().into_inner();
+                    let pred1 = if let Some(p) = inner.next() {
+                        Predicate::parse(p).unwrap()
+                    } else {
+                        Predicate::None
+                    };
+
+                    let op = inner.next().unwrap();
+                    let pred2 = if let Some(p) = inner.next() {
+                        Predicate::parse(p).unwrap()
+                    } else {
+                        Predicate::None
+                    };
+                    return match op.as_rule() {
+                        Rule::and => Ok(BoolPredicate::And(pred1, pred2)),
+                        Rule::or => Ok(BoolPredicate::Or(pred1, pred2)),
+                        _ => Err(()),
+                    };
+                }
+                Rule::neg_op => {
+                    let mut inner = p.clone().into_inner();
+                    let op = inner.next().unwrap();
+                    let pred = if let Some(p) = inner.next() {
+                        Predicate::parse(p).unwrap()
+                    } else {
+                        Predicate::None
+                    };
+                    return match op.as_rule() {
+                        Rule::neg => Ok(BoolPredicate::Neg(pred)),
+                        _ => Err(()),
+                    };
+                }
+                _ => return Err(()),
             }
-            return Err(());
         }
     }
 
@@ -514,7 +499,28 @@ mod label {
     #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
     pub(in crate) enum SideEffect<'a> {
         Increase(&'a str, &'a str),
+        Decrease(&'a str, &'a str),
+        Multiply(&'a str, &'a str),
+        Divide(&'a str, &'a str),
         None,
+    }
+
+    impl<'a> SideEffect<'a> {
+        pub(in crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
+            let mut inner = p.clone().into_inner();
+            let param1 = inner.next().unwrap().as_str();
+            let param2 = inner.next().unwrap().as_str();
+            assert_eq!(param1, param2);
+            let op = inner.next().unwrap();
+            let value = inner.next().unwrap().as_str();
+            match op.as_rule() {
+                Rule::incr => Ok(SideEffect::Increase(param1, value)),
+                Rule::decr => Ok(SideEffect::Decrease(param1, value)),
+                Rule::mult => Ok(SideEffect::Multiply(param1, value)),
+                Rule::div => Ok(SideEffect::Divide(param1, value)),
+                _ => Err(()),
+            }
+        }
     }
 
     impl<'a> Into<super::super::SideEffect> for SideEffect<'a> {
@@ -522,6 +528,15 @@ mod label {
             match self {
                 SideEffect::Increase(a, b) => {
                     super::super::SideEffect::Increase(a.to_string(), b.to_string())
+                }
+                SideEffect::Decrease(a, b) => {
+                    super::super::SideEffect::Decrease(a.to_string(), b.to_string())
+                }
+                SideEffect::Multiply(a, b) => {
+                    super::super::SideEffect::Multiply(a.to_string(), b.to_string())
+                }
+                SideEffect::Divide(a, b) => {
+                    super::super::SideEffect::Divide(a.to_string(), b.to_string())
                 }
                 SideEffect::None => super::super::SideEffect::None,
             }
@@ -563,24 +578,13 @@ mod label {
                 while let Some(p) = inner.next() {
                     match p.as_rule() {
                         Rule::predicate => {
-                            eprintln!("here0000");
                             if let Some(p) = p.into_inner().next() {
-                                eprintln!("here000");
                                 predicate = BoolPredicate::parse(p).unwrap();
                                 eprintln!("{:#?}", predicate);
                             }
                         }
                         Rule::side_effect => {
-                            let mut inner = p.clone().into_inner();
-                            let param1 = inner.next().unwrap().as_str();
-                            let param2 = inner.next().unwrap().as_str();
-                            assert_eq!(param1, param2);
-                            let op = inner.next().unwrap();
-                            let value = inner.next().unwrap().as_str();
-                            match op.as_rule() {
-                                Rule::incr => side_effect = SideEffect::Increase(param1, value),
-                                _ => (),
-                            }
+                            side_effect = SideEffect::parse(p).unwrap();
                         }
                         _ => (),
                     }
