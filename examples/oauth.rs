@@ -147,8 +147,9 @@ async fn client(role: &mut C) -> Result<(), Box<dyn Error>> {
                 let s = continuation.send(Quit(i)).await?;
                 Ok(((), s))
             }
-            ProtoC0::Login(Login(i), continuation) => {
-                let s = continuation.send(Password(i)).await?;
+            ProtoC0::Login(Login(_i), continuation) => {
+                // Change HERE for something != 10, so that authentication fails.
+                let s = continuation.send(Password(10)).await?;
                 match s.branch().await? {
                     ProtoC3::Auth(_i, end) => {
                         println!("Authenticated");
@@ -186,12 +187,10 @@ async fn auth(role: &mut A) -> Result<(), Box<dyn Error>> {
 
 async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: ProtoS<'_, _>| async {
-        // Change here for something != 10, so that authentication fails.
         let i: i32 = 10;
 
         // For the sake of the example, let assume that we never Cancel
-        let continuation = s.select(Login(i)).await?;
-        match continuation.branch().await? {
+        match s.branch().await? {
             ProtoS2::Auth(Auth(i), cont) => {
                 let end = cont.send(Auth(i)).await?;
                 Ok(((), end))
