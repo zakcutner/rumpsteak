@@ -1,21 +1,14 @@
-use proc_macro2::TokenStream;
 use proc_macro2::Span;
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use std::{collections::HashSet, mem};
 use syn::{
-    parse2, parse_quote, punctuated::Punctuated, Error, Fields, GenericArgument,
-    GenericParam, Ident, Index, Item, ItemEnum, ItemStruct, ItemType, PathArguments, Result, Type,
-    parse::ParseStream, parse::Parse, Token,
+    parse::Parse, parse::ParseStream, parse2, parse_quote, punctuated::Punctuated, Error, Fields,
+    GenericArgument, GenericParam, Ident, Index, Item, ItemEnum, ItemStruct, ItemType,
+    PathArguments, Result, Token, Type,
 };
 
-static STATES: [&str; 5] =
-[
-    "End",
-    "Send",
-    "Receive",
-    "Branch",
-    "Select",
-];
+static STATES: [&str; 5] = ["End", "Send", "Receive", "Branch", "Select"];
 
 fn idents_set<P>(params: &Punctuated<GenericParam, P>) -> HashSet<Ident> {
     let idents = params.iter().filter_map(|param| match param {
@@ -283,15 +276,15 @@ pub fn session(attr: TokenStream, input: TokenStream) -> Result<TokenStream> {
         Item::Type(input) => {
             let SessionParams(name, value) = parse2(attr)?;
             Ok(session_type(input, name, value))
-        },
+        }
         Item::Struct(input) => {
             let SessionParams(name, value) = parse2(attr)?;
             session_struct(input, name, value)
-        },
+        }
         Item::Enum(input) => {
             let SessionParams(name, value) = parse2(attr)?;
             session_enum(input, name, value)
-        },
+        }
         item => Err(Error::new_spanned(item, "expected a type, struct or enum")),
     }
 }
