@@ -1,4 +1,4 @@
-// global protocol Counter(role A, role B) 
+// global protocol Counter(role A, role B)
 // {
 //     choice at A {
 //         continue(i32) from A to B; @ x < 10 ;;; x := x + 1
@@ -6,32 +6,16 @@
 //     }
 // }
 
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    executor, try_join,
-};
 #[allow(unused_imports)]
 use ::rumpsteak::{
     channel::Bidirectional,
-    session,
-    Branch,
-    End,
-    Message,
-    Receive,
-    Role,
-    Roles,
-    Select,
-    Send,
-    effect::{
-        SideEffect,
-        Constant,
-        Incr,
-    },
-    try_session,
-    predicate::{
-        Tautology,
-        LTnVar
-    },
+    effect::{Constant, Incr, SideEffect},
+    predicate::{LTnVar, Tautology},
+    session, try_session, Branch, End, Message, Receive, Role, Roles, Select, Send,
+};
+use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    executor, try_join,
 };
 
 use std::collections::HashMap;
@@ -50,8 +34,7 @@ struct Roles {
 
 #[derive(Role)]
 #[message(Label)]
-struct A
-{
+struct A {
     #[route(B)]
     b: Channel,
 }
@@ -79,7 +62,10 @@ type CounterA = Select<B, LTnVar<Value, 'x', 'y'>, Incr<'x', 1>, CounterA0>;
 #[session(Name, Value)]
 enum CounterA0 {
     Nil(Nil, End),
-    Cons(Cons, Select<B, LTnVar<Value, 'x', 'y'>, Incr<'x', 1>, CounterA0>),
+    Cons(
+        Cons,
+        Select<B, LTnVar<Value, 'x', 'y'>, Incr<'x', 1>, CounterA0>,
+    ),
 }
 
 #[session(Name, Value)]
@@ -88,7 +74,10 @@ type CounterB = Branch<A, Tautology<Name, Value>, Constant<Name, Value>, Counter
 #[session(Name, Value)]
 enum CounterB0 {
     Nil(Nil, End),
-    Cons(Cons, Branch<A, Tautology<Name, Value>, Constant<Name, Value>, CounterB0>),
+    Cons(
+        Cons,
+        Branch<A, Tautology<Name, Value>, Constant<Name, Value>, CounterB0>,
+    ),
 }
 
 async fn a(role: &mut A) -> Result<(), Box<dyn Error>> {
@@ -96,8 +85,7 @@ async fn a(role: &mut A) -> Result<(), Box<dyn Error>> {
     map.insert('x', 0);
     map.insert('y', 10);
 
-    try_session(role, map,
-    |mut s: CounterA<'_, _>| async {
+    try_session(role, map, |mut s: CounterA<'_, _>| async {
         let mut i = 0;
         let s = loop {
             s = if i <= 15 {
@@ -114,21 +102,18 @@ async fn a(role: &mut A) -> Result<(), Box<dyn Error>> {
 }
 
 async fn b(role: &mut B) -> Result<(), Box<dyn Error>> {
-    try_session(role, HashMap::new(),
-        |s: CounterB<'_, _>| async {
-            let mut s = s;
-            loop{
-                match s.branch().await? {
-                    CounterB0::Cons(_, s2) => {
-                        s = s2 
-                    }
-                    CounterB0::Nil(_, end) => {
-                        println!("Terminated");
-                        return Ok(((), end))
-                    },
+    try_session(role, HashMap::new(), |s: CounterB<'_, _>| async {
+        let mut s = s;
+        loop {
+            match s.branch().await? {
+                CounterB0::Cons(_, s2) => s = s2,
+                CounterB0::Nil(_, end) => {
+                    println!("Terminated");
+                    return Ok(((), end));
                 }
             }
-        })
+        }
+    })
     .await
 }
 

@@ -1,5 +1,5 @@
-use std::marker::PhantomData;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
 /// A `SideEffect` is a structure that allows arbitrary modifications of a set
 /// of variables.
@@ -35,9 +35,7 @@ pub struct Incr<const NAME: char, const VALUE: i32> {
 
 impl<const NAME: char, const VALUE: i32> Default for Incr<NAME, VALUE> {
     fn default() -> Self {
-        Incr {
-            _p: PhantomData,
-        }
+        Incr { _p: PhantomData }
     }
 }
 

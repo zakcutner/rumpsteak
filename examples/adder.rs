@@ -86,20 +86,19 @@ async fn client(role: &mut C) -> Result<()> {
     .await
 }
 
-async fn S_func(s: Server<'_, S>) -> Result<((), End<'_, S>)> 
-{
-        let (Hello(u), mut s) = s.receive().await?;
-        let s = loop {
-            s = match s.branch().await? {
-                ServerChoice::Add(Add(v), s) => {
-                    let (Add(w), s) = s.receive().await?;
-                    s.send(Sum(u + v + w)).await?
-                }
-                ServerChoice::Bye(Bye, s) => break s.send(Bye).await?,
-            };
+async fn S_func(s: Server<'_, S>) -> Result<((), End<'_, S>)> {
+    let (Hello(u), mut s) = s.receive().await?;
+    let s = loop {
+        s = match s.branch().await? {
+            ServerChoice::Add(Add(v), s) => {
+                let (Add(w), s) = s.receive().await?;
+                s.send(Sum(u + v + w)).await?
+            }
+            ServerChoice::Bye(Bye, s) => break s.send(Bye).await?,
         };
+    };
 
-        Ok(((), s))
+    Ok(((), s))
 }
 
 async fn server(role: &mut S) -> Result<()> {

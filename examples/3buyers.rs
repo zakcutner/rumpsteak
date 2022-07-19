@@ -93,16 +93,26 @@ struct Empty1(i32);
 struct Empty2(i32);
 
 #[session]
-type ThreeBuyerC = Receive<S, Empty3, (), (), Receive<A, Empty4, (), (), Select<A, (), (), ThreeBuyerC2>>>;
+type ThreeBuyerC =
+    Receive<S, Empty3, (), (), Receive<A, Empty4, (), (), Select<A, (), (), ThreeBuyerC2>>>;
 
 #[session((), ())]
 enum ThreeBuyerC2 {
     Quit(Quit, Send<S, Quit, (), (), End<(), ()>>),
-    Valid(Valid, Send<S, Valid, (), (), Receive<S, Empty5, (), (), End<(), ()>>>),
+    Valid(
+        Valid,
+        Send<S, Valid, (), (), Receive<S, Empty5, (), (), End<(), ()>>>,
+    ),
 }
 
 #[session]
-type ThreeBuyerS = Receive<A, Empty1, (), (), Send<A, Empty2, (), (), Send<C, Empty3, (), (), Branch<C, (), (), ThreeBuyerS3>>>>;
+type ThreeBuyerS = Receive<
+    A,
+    Empty1,
+    (),
+    (),
+    Send<A, Empty2, (), (), Send<C, Empty3, (), (), Branch<C, (), (), ThreeBuyerS3>>>,
+>;
 
 #[session((), ())]
 enum ThreeBuyerS3 {
@@ -111,7 +121,13 @@ enum ThreeBuyerS3 {
 }
 
 #[session]
-type ThreeBuyerA = Send<S, Empty1, (), (), Receive<S, Empty2, (), (), Send<C, Empty4, (), (), Branch<C, (), (), ThreeBuyerA3>>>>;
+type ThreeBuyerA = Send<
+    S,
+    Empty1,
+    (),
+    (),
+    Receive<S, Empty2, (), (), Send<C, Empty4, (), (), Branch<C, (), (), ThreeBuyerA3>>>,
+>;
 
 #[session((), ())]
 enum ThreeBuyerA3 {
