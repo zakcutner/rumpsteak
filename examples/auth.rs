@@ -1,3 +1,26 @@
+// global protocol Authentication(role C, role S)
+// {
+//     password(i32) from C to S;
+                                                   
+//     choice at S
+//     {
+//         success(i32, i32) from S to C;
+//     }
+//     or
+//     {
+//         choice at S 
+//         {
+//             failure(i32) from S to C; if retry > 0
+//             do Authentication(C, S);
+//         }
+//         or
+//         {
+//             abort(i32) from S to C;
+//         }
+        
+//     }
+// }
+
 use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender,};
 use futures::{executor, try_join};
 #[allow(unused_imports)]
