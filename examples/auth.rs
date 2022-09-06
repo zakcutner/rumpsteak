@@ -124,22 +124,17 @@ async fn C(role: &mut C) -> Result<(), Box<dyn Error>> {
 async fn S(role: &mut S) -> Result<(), Box<dyn Error>> {
     let mut map = HashMap::new();
     map.insert('r', -10);
-    let retry = 10;
+    let mut retry = 10;
     try_session(role, map, |mut s: AuthS<'_, _>| async {
         loop {
             retry = retry - 1;
             let s_send = s.send(Retry(10)).await?;
             let (Password(n), s_rec) = s_send.receive().await?;
-            if n == 42 {
+            if n == 42 || retry == 0 {
                 let s_end = s_rec.select(Succeed(0)).await?;
                 return Ok(((), s_end));
             } else {
-                s = if retry == 0 {
-                    s_rec.select(Ok(-1)).await?
-                } else {
-                    s_rec.select(Fail(-1)).await?
-                };
-                
+                s = s_rec.select(Fail(-1)).await?
             }
         }
     }).await
