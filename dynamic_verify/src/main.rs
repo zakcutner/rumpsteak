@@ -144,7 +144,7 @@ fn generate(graph: Graph<Label>) -> (Vec<Send>, Vec<FreeVariableRefinement>) {
 }
 
 fn main() {
-    let dir = current_dir().unwrap().join("protocols/2buyers.txt");
+    let dir = current_dir().unwrap().join("protocols/travel_agency.txt");
     let filepath = dir.to_str().unwrap();
     let file = fs::read_to_string(filepath);
     if let Err(e) = &file {

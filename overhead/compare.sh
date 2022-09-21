@@ -1,39 +1,40 @@
-# cd rumpsteak/benches
 
-# cd
-# rm -rf rumpsteak_benches
+workdir=$(dirname $(cd $(dirname $0); pwd))
+echo $workdir
 
-mkdir results
+FOLDER=$(mktemp -d)
 
-# git clone https://github.com/qixi5703/rumpsteak.git
-# cd rumpsteak
-cd ..
+echo $FOLDER
+cd $FOLDER
+RESULTS=$(mktemp -d $FOLDER/results)
+
+echo $RESULTS
+
+cd $workdir
 git checkout master
 
 cargo build
 cd examples
 
-for file in 3buyers travel_agency auth; do
-    hyperfine --warmup 10 --runs 100 --export-json ../overhead/results/$file.1.json "cargo run --example ${file}" 
+for file in 3buyers travel_agency auth diabetes; do
+    hyperfine --warmup 10 --runs 1000 --export-json $RESULTS/$file.1.json "cargo run --example $file" 
 done
 
-# git checkout refined_mpst
 git checkout main
 cd ..
 cargo build
 cd examples
 
-for file in 3buyers travel_agency auth; do
-    hyperfine --warmup 10 --runs 100 --export-json ../overhead/results/$file.2.json "cargo run --example ${file}" 
+for file in 3buyers travel_agency auth diabetes; do
+    hyperfine --warmup 10 --runs 1000 --export-json $RESULTS/$file.2.json "cargo run --example $file" 
 done
 
-cd ..
-cd overhead
-# git clone https://github.com/qixi5703/hyperfine.git
 
-for file in 3buyers travel_agency auth; do
+
+cd $workdir/overhead
+for file in 3buyers travel_agency auth diabetes; do
     echo "*********$file**********"
-    python3 cal_diff.py results/$file.1.json results/$file.2.json
+    python3 eval.py $RESULTS/$file.1.json $RESULTS/$file.2.json
 done
 
 
