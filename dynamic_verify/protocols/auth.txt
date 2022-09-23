@@ -1,0 +1,12 @@
+digraph G {
+  0;
+  1;
+  2;
+  4;
+  
+  0 -> 1 [label="S!C retry(r:u32)", ];
+  1 -> 2 [label="C!S password(n:u32)", ];
+  2 -> 0 [label="S!C failure(i:u32):i<10", ];
+  2 -> 4 [label="S!C success(j:u32)", ];
+  
+  }
