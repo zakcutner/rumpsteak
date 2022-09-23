@@ -32,8 +32,7 @@ pub struct Label<'a> {
     pub(in crate) receiver: char,                   // "C"
     pub(in crate) payload: &'a str,                 // "empty3"
     pub(in crate) parameters: Vec<(char, &'a str)>, // (name, type) ("x", "u32")
-    pub(in crate) refinements: Vec<char>, // ['x']
-
+    pub(in crate) refinements: Vec<char>,           // ['x']
 }
 
 impl<'a> Label<'a> {
@@ -71,7 +70,7 @@ impl<'a> Label<'a> {
             let mut refinements = Vec::new();
             while let Some(p) = inner.next() {
                 match p.as_rule() {
-                    // case 1: x < 10 
+                    // case 1: x < 10
                     // case 2: x < y
                     Rule::predicate => {
                         let mut inner = p.clone().into_inner();

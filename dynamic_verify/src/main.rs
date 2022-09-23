@@ -2,8 +2,8 @@ use crepe::crepe;
 
 use dot_parser::canonical::Graph;
 use dot_parser::*;
-use std::env::current_dir;
 use std::env;
+use std::env::current_dir;
 use std::fs;
 mod parser;
 use parser::Label;
@@ -98,7 +98,8 @@ fn generate(graph: Graph<Label>) -> (Vec<Send>, Vec<FreeVariableRefinement>) {
         if edge.attr.elems.len() > 0 {
             let label = edge.attr.elems[0].clone();
             for (param, _) in label.parameters {
-                eprintln!("
+                eprintln!(
+                    "
                 Send(
                     State {{
                         index: {},
@@ -112,7 +113,9 @@ fn generate(graph: Graph<Label>) -> (Vec<Send>, Vec<FreeVariableRefinement>) {
                         index: {},
                     }},
                 )
-                ", edge.from, label.sender, param, label.receiver, edge.to);
+                ",
+                    edge.from, label.sender, param, label.receiver, edge.to
+                );
                 list.push(Send(
                     State {
                         index: FromStr::from_str(edge.from).unwrap(),
@@ -146,7 +149,7 @@ fn generate(graph: Graph<Label>) -> (Vec<Send>, Vec<FreeVariableRefinement>) {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     if args.len() != 2 {
         eprint!("Please use the command 'cargo run xxx'");
         return;
@@ -167,8 +170,6 @@ fn main() {
     let canonical_graph: canonical::Graph<'_, _> = graph.into();
     let filtered_graph = canonical_graph.filter_map(|a| filter(a));
 
-    // eprint!("{:#?}", &filtered_graph);
-
     let mut runtime = Crepe::new();
     let (transitions, fv) = generate(filtered_graph);
     runtime.extend(&transitions);
@@ -177,11 +178,6 @@ fn main() {
     for FreeVariableRefinement(s1, param, s2) in fv {
         println!("FreeVariableRefinement {} {} {}", s1, param, s2);
     }
-
-    //    runtime.extend(&[
-    //        FreeVariableRefinement(State { index: 2}, 'x', State{index: 3}),
-    //        FreeVariableRefinement(State { index: 2}, 'y', State{index: 3}),
-    //    ]);
 
     let (set_in, errorfv, errordup) = runtime.run();
     for In(s, p, v) in set_in {
