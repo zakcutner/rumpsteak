@@ -58,4 +58,4 @@ debug = true
 debug = true
 
 [workspace]
-members = ["caching", "fsm", "generate", "macros", "oneshot"]
+members = ["caching", "fsm", "generate", "macros", "oneshot", "dynamic_verify"]

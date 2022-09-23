@@ -3,6 +3,7 @@ use crepe::crepe;
 use dot_parser::canonical::Graph;
 use dot_parser::*;
 use std::env::current_dir;
+use std::env;
 use std::fs;
 mod parser;
 use parser::Label;
@@ -144,7 +145,18 @@ fn generate(graph: Graph<Label>) -> (Vec<Send>, Vec<FreeVariableRefinement>) {
 }
 
 fn main() {
-    let dir = current_dir().unwrap().join("protocols/travel_agency.txt");
+    let args: Vec<String> = env::args().collect();
+    
+    if args.len() != 2 {
+        eprint!("Please use the command 'cargo run xxx'");
+        return;
+    };
+
+    let mut file = String::from("protocols/");
+    file += &args[1];
+    file += ".txt";
+
+    let dir = current_dir().unwrap().join(file.as_str());
     let filepath = dir.to_str().unwrap();
     let file = fs::read_to_string(filepath);
     if let Err(e) = &file {
