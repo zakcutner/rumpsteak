@@ -6,10 +6,10 @@ digraph C {
   8;
   
   
-  0 -> 2 [label="S?Retry(x: i32)", ];
-  2 -> 3 [label="S!Password(x: i32)", ];
-  3 -> 0 [label="S?Failure(x: i32)", ];
-  3 -> 5 [label="S?Success(x: i32)", ];
-  3 -> 8 [label="S?Abort(x: i32)", ];
+  0 -> 2 [label="S?Retry(i32)", ];
+  2 -> 3 [label="S!Password(i32)", ];
+  3 -> 0 [label="S?Failure(i32)", ];
+  3 -> 5 [label="S?Success(i32)", ];
+  3 -> 8 [label="S?Abort(i32)", ];
   
   }
