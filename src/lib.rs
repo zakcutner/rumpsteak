@@ -139,7 +139,7 @@ impl<'r, R: Role, N, V> Session<'r> for End<'r, R, N, V> {}
 /// This structure represents a protocol which next action is to send.
 pub struct Send<'q, Q: Role, N, V, R, L, P, U, S: FromState<'q, Role = Q, Name = N, Value = V>>
 where
-    P: Predicate<Name = N, Value = V, Label = L>,
+    P: Predicate<Name = N, Value = V>,
     U: SideEffect<Name = N, Value = V>,
 {
     state: State<'q, Q, N, V>,
@@ -151,7 +151,7 @@ where
 impl<'q, Q: Role, R, L, S: FromState<'q, Role = Q, Name = N, Value = V>, N, V, P, U> FromState<'q>
     for Send<'q, Q, N, V, R, L, P, U, S>
 where
-    P: Predicate<Name = N, Value = V, Label = L>,
+    P: Predicate<Name = N, Value = V>,
     U: SideEffect<Name = N, Value = V>,
 {
     type Role = Q;
@@ -207,7 +207,7 @@ where
 /// This structure represents a protocol which next action is to receive.
 pub struct Receive<'q, Q: Role, N, V, R, L, P, U, S: FromState<'q, Role = Q>>
 where
-    P: Predicate<Name = N, Value = V, Label = L>,
+    P: Predicate<Name = N, Value = V>,
     U: SideEffect<Name = N, Value = V>,
 {
     state: State<'q, Q, N, V>,
@@ -218,7 +218,7 @@ where
 
 impl<'q, Q: Role, R, L, S, N, V, P, U> FromState<'q> for Receive<'q, Q, N, V, R, L, P, U, S>
 where
-    P: Predicate<Name = N, Value = V, Label = L>,
+    P: Predicate<Name = N, Value = V>,
     U: SideEffect<Name = N, Value = V>,
     S: FromState<'q, Role = Q>,
 {

@@ -1,0 +1,16 @@
+global protocol PlusMinus(role A, role B, role C)
+{
+	Secret(n: i32) from A to B;
+	rec Loop {
+		Guess(x: i32) from C to B;
+		choice at B {
+			More(x: i32 {x < n}) from B to C;
+			continue Loop;
+		} or {
+			Less(x: i32 {x > n}) from B to C;
+			continue Loop;
+		} or {
+			Correct(x: i32 {x = n}) from B to C;
+		}
+	}
+}

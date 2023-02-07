@@ -5,21 +5,22 @@ raw_ident = @{ ASCII_DIGIT+ | (ASCII_ALPHA ~ char*) | ("_" ~ char+) }
 quoted_ident = { "\"" ~ (char | "\\\"")* ~ "\"" }
 ident = { quoted_ident | raw_ident }
 
+variable = @{ (ASCII_ALPHA ~ char*) | ("_" ~ char+) }
+constant = @{ ASCII_DIGIT+ }
+atom = _{ variable | constant }
+
 send = { "!" }
 receive = { "?" }
 
 ltn = { "<" }
 gtn = { ">" }
-eq = { "==" }
-and = { " and " }
-or = { " or " }
-neg = { "neg " }
-op = { ident ~ (ltn | gtn | eq) ~ ident }
-compthree = { ident ~ (ltn | gtn ) ~ ident ~ (ltn | gtn ) ~ ident }
-basic = { compthree | op }
-bool_op = { op ~ (and | or ) ~ op }
-neg_op = { neg ~ op }
-predicate = { neg_op | bool_op | basic }
+eq = { "=" }
+comp = { atom ~ (ltn | gtn | eq) ~ atom }
+
+and = { "(" ~ predicate ~ ")" ~ "∧" ~ "(" ~ predicate ~ ")" }
+or = { "(" ~ predicate ~ ")" ~ "∨" ~ "(" ~ predicate ~ ")" }
+neg = { "!" ~ "(" ~ predicate ~ ")" }
+predicate = { comp | neg | or | and }
 
 incr = { "+" }
 decr = { "-" }
@@ -29,9 +30,6 @@ side_effect = { ident ~ "=" ~ ident ~ ( incr | decr | mult | div ) ~ ident }
 
 param = { ident ~ ":" ~ ident }
 parameters = { (param ~ ",")* ~ param? }
-label = { "\""? ~ ident ~ (send | receive) ~ ident ~ "(" ~ parameters ~ ")" ~ ( ":" ~ predicate)? ~ ( ":" ~ side_effect)? ~ "\"" }
+label = { "\""? ~ ident ~ (send | receive) ~ ident ~ "(" ~ parameters ~ ("{" ~ predicate ~ "}")? ~ ")" ~ ( ":" ~ side_effect)? ~ "\"" }
 
-
-ltn_bk = { "<" ~ ident }
-gtn_bk = { ">" ~ ident }
-predicate_bk = { ident ~ (ltn_bk | gtn_bk) }
+WHITESPACE = _{ " " | "\t" | NEWLINE }

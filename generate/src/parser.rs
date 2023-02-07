@@ -148,8 +148,6 @@ impl<'a> Tree<'a> {
             labels: context.labels,
         };
 
-        eprintln!("{:#?}", tree);
-
         Ok(tree)
     }
 }
@@ -322,176 +320,215 @@ mod label {
     }
 
     #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
-    pub(in crate) enum Predicate<'a> {
-        LTnVar(&'a str, &'a str),
-        LTnConst(&'a str, &'a str),
-        GTnVar(&'a str, &'a str),
-        GTnConst(&'a str, &'a str),
-        EqualVar(&'a str, &'a str),
-        EqualConst(&'a str, &'a str),
-        LTnThree(&'a str, &'a str, &'a str),
-        GTnThree(&'a str, &'a str, &'a str),
-        None,
+    pub(in crate) enum Atom {
+        Var(String),
+        Const(String),
     }
 
-    impl<'a> Into<super::super::Predicate> for Predicate<'a> {
-        fn into(self) -> super::super::Predicate {
-            match self {
-                Predicate::LTnVar(a, b) => {
-                    super::super::Predicate::LTnVar(a.to_string(), b.to_string())
-                }
-                Predicate::LTnConst(a, b) => {
-                    super::super::Predicate::LTnConst(a.to_string(), b.to_string())
-                }
-                Predicate::GTnVar(a, b) => {
-                    super::super::Predicate::GTnVar(a.to_string(), b.to_string())
-                }
-                Predicate::GTnConst(a, b) => {
-                    super::super::Predicate::GTnConst(a.to_string(), b.to_string())
-                }
-                Predicate::EqualVar(a, b) => {
-                    super::super::Predicate::EqualVar(a.to_string(), b.to_string())
-                }
-                Predicate::EqualConst(a, b) => {
-                    super::super::Predicate::EqualConst(a.to_string(), b.to_string())
-                }
-                Predicate::LTnThree(a, b, c) => {
-                    super::super::Predicate::LTnThree(a.to_string(), b.to_string(), c.to_string())
-                }
-                Predicate::GTnThree(a, b, c) => {
-                    super::super::Predicate::GTnThree(a.to_string(), b.to_string(), c.to_string())
-                }
-                Predicate::None => super::super::Predicate::None,
-            }
-        }
-    }
-
-    impl<'a> Predicate<'a> {
-        pub(in crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
+    impl Atom {
+        pub (in crate) fn parse<'a>(p: Pair<'a, Rule>) -> Result<Self, ()> {
             match p.as_rule() {
-                Rule::op => {
-                    let mut inner = p.clone().into_inner();
-                    let param = inner.next().unwrap().as_str();
-                    let op = inner.next().unwrap();
-                    let value = inner.next().unwrap().as_str();
-                    let first_char = value.chars().nth(0).unwrap();
-                    match op.as_rule() {
-                        Rule::ltn => {
-                            // check is the second operand is a number
-                            if first_char.is_digit(10) {
-                                Ok(Predicate::LTnConst(param, value))
-                            } else {
-                                Ok(Predicate::LTnVar(param, value))
-                            }
-                        }
-                        Rule::gtn => {
-                            // check is the second operand is a number
-                            if first_char.is_digit(10) {
-                                Ok(Predicate::GTnConst(param, value))
-                            } else {
-                                Ok(Predicate::GTnVar(param, value))
-                            }
-                        }
-                        Rule::eq => {
-                            // check is the second operand is a number
-                            if first_char.is_digit(10) {
-                                Ok(Predicate::EqualConst(param, value))
-                            } else {
-                                Ok(Predicate::EqualVar(param, value))
-                            }
-                        }
-                        _ => Err(()),
-                    }
+                Rule::variable => {
+                    let name: String = p.as_str().to_string();
+                    Ok(Atom::Var(name))
                 }
-                Rule::compthree => {
-                    let mut inner = p.clone().into_inner();
-                    let param = inner.next().unwrap().as_str();
-                    let op = inner.next().unwrap();
-                    let value1 = inner.next().unwrap().as_str();
-                    let _ = inner.next().unwrap();
-                    let value2 = inner.next().unwrap().as_str();
-                    match op.as_rule() {
-                        Rule::ltn => Ok(Predicate::LTnThree(param, value1, value2)),
-                        Rule::gtn => Ok(Predicate::GTnThree(param, value1, value2)),
-                        _ => Err(()),
-                    }
+                Rule::constant => {
+                    let val: String = p.as_str().to_string();
+                    Ok(Atom::Const(val))
                 }
-                _ => Err(()),
+                _ => {
+                    Err(())
+                }
             }
         }
     }
 
     #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
-    pub(in crate) enum BoolPredicate<'a> {
-        Normal(Predicate<'a>),
-        And(Predicate<'a>, Predicate<'a>),
-        Or(Predicate<'a>, Predicate<'a>),
-        Neg(Predicate<'a>),
-        None,
+    pub(in crate) enum Predicate {
+        LTn(Atom, Atom),
+        GTn(Atom, Atom),
+        Equal(Atom, Atom),
     }
 
-    impl<'a> BoolPredicate<'a> {
-        pub(in crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
-            match p.as_rule() {
-                Rule::basic => {
-                    let mut inner = p.clone().into_inner();
-                    let pred = if let Some(p) = inner.next() {
-                        Predicate::parse(p).unwrap()
-                    } else {
-                        Predicate::None
-                    };
-                    return Ok(BoolPredicate::Normal(pred));
+    impl Into<super::super::Predicate> for Predicate {
+        fn into(self) -> super::super::Predicate {
+            match self {
+                Predicate::LTn(a, b) => {
+                    match a {
+                        Atom::Var(a_name) => {
+                            match b {
+                                Atom::Var(b_name) => {
+                                    super::super::Predicate::LTnVar(a_name, b_name)
+                                }
+                                Atom::Const(val) => {
+                                    super::super::Predicate::LTnConst(a_name, val)
+                                }
+                            }
+                        }
+                        Atom::Const(val) => {
+                            panic!()
+                        }
+                    }
                 }
-                Rule::bool_op => {
-                    let mut inner = p.clone().into_inner();
-                    let pred1 = if let Some(p) = inner.next() {
-                        Predicate::parse(p).unwrap()
-                    } else {
-                        Predicate::None
-                    };
-
-                    let op = inner.next().unwrap();
-                    let pred2 = if let Some(p) = inner.next() {
-                        Predicate::parse(p).unwrap()
-                    } else {
-                        Predicate::None
-                    };
-                    return match op.as_rule() {
-                        Rule::and => Ok(BoolPredicate::And(pred1, pred2)),
-                        Rule::or => Ok(BoolPredicate::Or(pred1, pred2)),
-                        _ => Err(()),
-                    };
+                Predicate::GTn(a, b) => {
+                    match a {
+                        Atom::Var(a_name) => {
+                            match b {
+                                Atom::Var(b_name) => {
+                                    super::super::Predicate::GTnVar(a_name, b_name)
+                                }
+                                Atom::Const(val) => {
+                                    super::super::Predicate::GTnConst(a_name, val)
+                                }
+                            }
+                        }
+                        Atom::Const(val) => {
+                            panic!()
+                        }
+                    }
                 }
-                Rule::neg_op => {
-                    let mut inner = p.clone().into_inner();
-                    let op = inner.next().unwrap();
-                    let pred = if let Some(p) = inner.next() {
-                        Predicate::parse(p).unwrap()
-                    } else {
-                        Predicate::None
-                    };
-                    return match op.as_rule() {
-                        Rule::neg => Ok(BoolPredicate::Neg(pred)),
-                        _ => Err(()),
-                    };
+                Predicate::Equal(a, b) => {
+                    match a {
+                        Atom::Var(a_name) => {
+                            match b {
+                                Atom::Var(b_name) => {
+                                    super::super::Predicate::EqualVar(a_name, b_name)
+                                }
+                                Atom::Const(val) => {
+                                    super::super::Predicate::EqualConst(a_name, val)
+                                }
+                            }
+                        }
+                        Atom::Const(val) => {
+                            panic!()
+                        }
+                    }
                 }
-                _ => return Err(()),
             }
         }
     }
 
-    impl<'a> Into<super::super::BoolPredicate> for BoolPredicate<'a> {
+    impl Predicate {
+        pub(in crate) fn parse<'a>(p: Pair<'a, Rule>) -> Result<Self, ()> {
+            if let Rule::comp = p.as_rule() {
+                let mut inner = p.into_inner();
+                let lhs: Atom = Atom::parse(inner.next().unwrap())?;
+                let op = inner.next().unwrap();
+                let rhs: Atom = Atom::parse(inner.next().unwrap())?;
+
+                match op.as_rule() {
+                    Rule::ltn => {
+                        Ok(Predicate::LTn(lhs, rhs))
+                    }
+                    Rule::gtn => {
+                            Ok(Predicate::GTn(lhs, rhs))
+                    }
+                    Rule::eq => {
+                            Ok(Predicate::Equal(lhs, rhs))
+                    }
+                    _ => Err(()),
+                }
+
+            } else {
+                Err(())
+            }
+        }
+    }
+
+    #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
+    pub(in crate) enum BoolPredicate {
+        Normal(Predicate),
+        And(Box<BoolPredicate>, Box<BoolPredicate>),
+        Or(Box<BoolPredicate>, Box<BoolPredicate>),
+        Neg(Box<BoolPredicate>),
+        Tautology,
+    }
+
+    impl BoolPredicate {
+        pub(in crate) fn parse<'a>(p: Pair<'a, Rule>) -> Result<Self, ()> {
+            match p.as_rule() {
+                Rule::comp => {
+                    let res = BoolPredicate::Normal(Predicate::parse(p)?);
+                    Ok(res)
+                }
+                Rule::neg => {
+                    let mut inners = p.into_inner();
+                    let inner = inners.next().unwrap();
+                    let inner_rule = inner.as_rule();
+                    if let Rule::predicate = inner_rule {
+                        let mut inners = inner.into_inner();
+                        let inner = inners.next().unwrap();
+                        let inner = BoolPredicate::parse(inner)?;
+                        Ok(BoolPredicate::Neg(Box::new(inner)))
+                    } else {
+                        Err(())
+                    }
+                }
+                Rule::or => {
+                    let mut inners = p.into_inner();
+                    let lhs = inners.next().unwrap();
+                    let lhs_rule = lhs.as_rule();
+                    let rhs = inners.next().unwrap();
+                    let rhs_rule = rhs.as_rule();
+                    if Rule::predicate == rhs_rule && Rule::predicate == lhs_rule {
+                        let mut rhs_inners = rhs.into_inner();
+                        let rhs = rhs_inners.next().unwrap();
+                        let rhs = BoolPredicate::parse(rhs)?;
+
+                        let mut lhs_inners = lhs.into_inner();
+                        let lhs = lhs_inners.next().unwrap();
+                        let lhs = BoolPredicate::parse(lhs)?;
+                        Ok(BoolPredicate::Or(Box::new(rhs), Box::new(lhs)))
+                    } else {
+                        Err(())
+                    }
+                }
+                Rule::and => {
+                    let mut inners = p.into_inner();
+                    let lhs = inners.next().unwrap();
+                    let lhs_rule = lhs.as_rule();
+                    let rhs = inners.next().unwrap();
+                    let rhs_rule = rhs.as_rule();
+                    if Rule::predicate == rhs_rule && Rule::predicate == lhs_rule {
+                        let mut rhs_inners = rhs.into_inner();
+                        let rhs = rhs_inners.next().unwrap();
+                        let rhs = BoolPredicate::parse(rhs)?;
+
+                        let mut lhs_inners = lhs.into_inner();
+                        let lhs = lhs_inners.next().unwrap();
+                        let lhs = BoolPredicate::parse(lhs)?;
+                        Ok(BoolPredicate::And(Box::new(rhs), Box::new(lhs)))
+                    } else {
+                        Err(())
+                    }
+                }
+                _ => {
+                    println!("{:#?}", p);
+                    return Err(())
+                },
+            }
+        }
+    }
+
+    impl Into<super::super::BoolPredicate> for BoolPredicate {
         fn into(self) -> super::super::BoolPredicate {
             match self {
                 BoolPredicate::Normal(pred) => super::super::BoolPredicate::Normal(pred.into()),
                 BoolPredicate::And(pred1, pred2) => {
-                    super::super::BoolPredicate::And(pred1.into(), pred2.into())
+                    let lhs: BoolPredicate = *pred1;
+                    let rhs: BoolPredicate = *pred2;
+                    super::super::BoolPredicate::And(Box::new(lhs.into()), Box::new(rhs.into()))
                 }
                 BoolPredicate::Or(pred1, pred2) => {
-                    super::super::BoolPredicate::Or(pred1.into(), pred2.into())
+                    let lhs: BoolPredicate = *pred1;
+                    let rhs: BoolPredicate = *pred2;
+                    super::super::BoolPredicate::Or(Box::new(lhs.into()), Box::new(rhs.into()))
                 }
-                BoolPredicate::Neg(pred) => super::super::BoolPredicate::Neg(pred.into()),
-                _ => super::super::BoolPredicate::None,
+                BoolPredicate::Neg(pred) => {
+                    let inner: BoolPredicate = *pred;
+                    super::super::BoolPredicate::Neg(Box::new(inner.into()))
+                },
+                BoolPredicate::Tautology => super::super::BoolPredicate::Tautology,
             }
         }
     }
@@ -549,7 +586,7 @@ mod label {
         pub(in crate) direction: Direction,
         pub(in crate) payload: &'a str,
         pub(in crate) parameters: Vec<(&'a str, &'a str)>, // (name, type)
-        pub(in crate) predicate: BoolPredicate<'a>,
+        pub(in crate) predicate: BoolPredicate,
         pub(in crate) side_effect: SideEffect<'a>,
     }
 
@@ -573,14 +610,13 @@ mod label {
                         }
                     }
                 }
-                let mut predicate = BoolPredicate::None;
+                let mut predicate = BoolPredicate::Tautology;
                 let mut side_effect = SideEffect::None;
                 while let Some(p) = inner.next() {
                     match p.as_rule() {
                         Rule::predicate => {
                             if let Some(p) = p.into_inner().next() {
                                 predicate = BoolPredicate::parse(p).unwrap();
-                                eprintln!("{:#?}", predicate);
                             }
                         }
                         Rule::side_effect => {
@@ -617,7 +653,7 @@ mod label {
             Direction,
             &'a str,
             Vec<(&'a str, &'a str)>,
-            BoolPredicate<'a>,
+            BoolPredicate,
             SideEffect<'a>,
         ) {
             (

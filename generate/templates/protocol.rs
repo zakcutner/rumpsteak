@@ -20,17 +20,16 @@ use ::rumpsteak::{
         Incr,
     },
     try_session,
-    predicate::{
-        Tautology,
-        LTnVar,
-        GTnVar
-    },
+    predicate::*,
 };
 
 use std::collections::HashMap;
 use std::error::Error;
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
+
+type Name = char;
+type Value = i32;
 
 #[derive(Roles)]
 #[allow(dead_code)]
@@ -78,6 +77,37 @@ enum {{ camel }}{{ role.camel }}{{ node }} {
     {%- let label = labels[choice.label] %}
     {{ label.camel }}({{ label.camel }}, {{ choice.ty|ty(camel, role, roles, labels) }}),
 {%- endfor %}
+}
+#[derive(Default)]
+struct {{ camel }}{{ role.camel }}{{ node }}Predicate {}
+impl Predicate for {{ camel }}{{ role.camel }}{{ node }}Predicate {
+    type Name = Name;
+    type Value = Value;
+    type Label = Label;
+    type Error = ();
+
+    fn check(
+        &self,
+        m: &HashMap<Self::Name, Self::Value>,
+        label: Option<&Self::Label>
+    ) -> Result<(), Self::Error> {
+        if let Some(label) = label {
+            match label {
+                {%- for choice in choices %}
+                {%- let label = labels[choice.label] %}
+                Label::{{ label.camel }}(_) => {
+                    {{ choice.predicate }}::default()
+                        .check(m, Some(label))
+                    },
+                {%- endfor %}
+                _ => {
+                    Err(())
+                }
+            }
+        } else {
+            Err(())
+        }
+    }
 }
 {%- endmatch %}
 {% endfor %}

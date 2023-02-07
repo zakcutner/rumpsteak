@@ -338,17 +338,14 @@ where
 }
 
 /// The `And` struct implements an and operator (e.g. pred1 and pred 2).
-pub struct And<L, LHS: Predicate, RHS: Predicate, N, V> {
-    _p: PhantomData<(LHS, RHS, N, V, L)>,
+pub struct And<LHS: Predicate, RHS: Predicate> {
+    _p: PhantomData<(LHS, RHS)>,
 }
 
 impl<
-        L,
-        LHS: Predicate<Name = N, Value = V, Error = ()>,
-        RHS: Predicate<Name = N, Value = V, Error = ()>,
-        N,
-        V,
-    > Default for And<L, LHS, RHS, N, V>
+        LHS: Predicate,
+        RHS: Predicate,
+    > Default for And<LHS, RHS>
 {
     fn default() -> Self {
         Self { _p: PhantomData }
@@ -357,11 +354,11 @@ impl<
 
 impl<
         L,
-        LHS: Predicate<Name = N, Value = V, Error = ()>,
-        RHS: Predicate<Name = N, Value = V, Error = ()>,
+        LHS: Predicate<Name = N, Value = V, Label = L, Error = ()>,
+        RHS: Predicate<Name = N, Value = V, Label = L, Error = ()>,
         N,
         V,
-    > Predicate for And<L, LHS, RHS, N, V>
+    > Predicate for And<LHS, RHS>
 {
     type Name = N;
     type Value = V;

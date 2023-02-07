@@ -211,7 +211,7 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
                 direction: weight.direction.unwrap(),
                 role: weight.role.unwrap(),
                 node: node.index(),
-                predicate: BoolPredicate::None,
+                predicate: BoolPredicate::Tautology,
                 side_effect: SideEffect::None,
             };
 
@@ -225,6 +225,7 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
                 .map(|edge| Choice {
                     label: edge.weight().label,
                     ty: self.visit(edge.target()).0,
+                    predicate: edge.weight().predicate.clone(),
                 })
                 .collect::<Vec<_>>();
             self.definitions.push(Definition {
