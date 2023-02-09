@@ -19,7 +19,7 @@ default = ["clap"]
 
 [dependencies]
 askama = { git = "https://github.com/djc/askama", rev = "95e346e" }
-clap = { version = "3.0.0-rc.7", optional = true, features=["derive"]}
+clap = { version = "*", optional = true, features=["derive"]}
 heck = "0.3"
 indexmap = "1.6"
 pest = "2.1"

@@ -148,12 +148,15 @@ impl<'a> TypeFormatter<'a> {
         &self.labels[*label].camel
     }
 
-    fn node(&self, node: &usize) -> &str {
-        &self.role.nodes[*node]
+    fn param_names(&self, label: &usize) -> Vec<&str> {
+        self.labels[*label].param_names
+            .iter()
+            .map(|s| s as &str)
+            .collect()
     }
 
-    fn pred(&self, predicate: &Predicate) -> String {
-        predicate.to_string()
+    fn node(&self, node: &usize) -> &str {
+        &self.role.nodes[*node]
     }
 
     fn boolpred(&self, predicate: &BoolPredicate) -> String {
@@ -216,8 +219,9 @@ impl Display for TypeFormatter<'_> {
                 side_effect,
                 next,
             } => {
-                let (other, label, pred, effect, next) = (
+                let (other, param_name, label, pred, effect, next) = (
                     self.role(role),
+                    self.param_names(label).iter().next().unwrap().clone(),
                     self.label(label),
                     self.boolpred(predicate),
                     self.effect(side_effect),
@@ -226,13 +230,13 @@ impl Display for TypeFormatter<'_> {
                 match direction {
                     Direction::Send => write!(
                         f,
-                        "Send<{}, {}, {}, {}, {}>",
-                        other, label, pred, effect, next
+                        "Send<{}, '{}', {}, {}, {}, {}>",
+                        other, param_name, label, pred, effect, next
                     ),
                     Direction::Receive => write!(
                         f,
-                        "Receive<{}, {}, {}, {}, {}>",
-                        other, label, pred, effect, next
+                        "Receive<{}, '{}', {}, {}, {}, {}>",
+                        other, param_name, label, pred, effect, next
                     ),
                 }
             }
@@ -243,7 +247,6 @@ impl Display for TypeFormatter<'_> {
                 predicate,
                 side_effect,
             } => {
-                let other = self.role(role);
                 let (other, name, role, node, pred, effect) = (
                     self.role(role),
                     self.name,

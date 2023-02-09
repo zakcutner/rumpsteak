@@ -21,6 +21,8 @@ use ::rumpsteak::{
     },
     try_session,
     predicate::*,
+    ParamName,
+    Param,
 };
 
 use std::collections::HashMap;
@@ -49,16 +51,35 @@ struct {{ role.camel }} {
 {%- endfor %}
 }
 {% endfor %}
-#[derive(Message)]
+#[derive(Message, Copy, Clone)]
 enum Label {
 {%- for label in labels %}
     {{ label.camel }}({{ label.camel }}),
 {%- endfor %}
 }
+
+impl From<Label> for Value {
+    fn from(label: Label) -> Value {
+        match label {
+        {%- for label in labels %}
+            Label::{{ label.camel }}(payload) => payload.into(),
+        {%- endfor %}
+        }
+    }
+}
+
 {% for label in labels %}
+#[derive(Copy, Clone)]
 struct {{ label.camel }}{% if !label.parameters.is_empty() -%}
     ({{ label.parameters|join(", ") }})
 {%- endif %};
+
+impl From<{{ label.camel }}> for Value {
+    fn from(value: {{ label.camel }}) -> Value {
+        let {{ label.camel }}(val) = value;
+        val
+    }
+}
 {% endfor %}
 {%- for role in roles %}
 {%- for (i, definition) in role.definitions.iter().rev().enumerate() %}
@@ -78,6 +99,30 @@ enum {{ camel }}{{ role.camel }}{{ node }} {
     {{ label.camel }}({{ label.camel }}, {{ choice.ty|ty(camel, role, roles, labels) }}),
 {%- endfor %}
 }
+
+impl<'__r, __R: ::rumpsteak::Role> Param<Name, Value, Label> for {{ camel }}{{ role.camel }}{{ node }}<'__r, __R> {
+    fn get_param(l: &Label) -> (Name, Value) {
+        match l {
+            {%- for choice in choices %}
+            {%- let label = labels[choice.label] %}
+            Label::{{ label.camel }}({{ label.camel }}(val)) => {
+                    ('{{ label.param_names[0] }}', *val)
+            }
+            {%- endfor %}
+            _ => panic!("Unexpected label"),
+        }
+    }
+}
+
+{%- for choice in choices %}
+{%- let label = labels[choice.label] %}
+impl<'__r, __R: ::rumpsteak::Role> ParamName<{{ label.camel }}, Name> for {{ camel }}{{ role.camel }}{{ node }}<'__r, __R> {
+    fn get_param_name() -> Name {
+        '{{ label.param_names[0] }}'
+    }
+}
+{%- endfor %}
+
 #[derive(Default)]
 struct {{ camel }}{{ role.camel }}{{ node }}Predicate {}
 impl Predicate for {{ camel }}{{ role.camel }}{{ node }}Predicate {
