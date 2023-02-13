@@ -18,6 +18,7 @@ pub(crate) enum Predicate {
     GTnConst(String, String),
     EqualVar(String, String),
     EqualConst(String, String),
+    Tautology(Option<String>),
 }
 
 impl Display for Predicate {
@@ -41,6 +42,23 @@ impl Display for Predicate {
             Predicate::EqualConst(param, value) => {
                 write!(f, "EqualConst::<Value, '{}', {}>", param, value)
             }
+            Predicate::Tautology(label) => {
+                match label {
+                    None => write!(f, "Tautology<Name, Value, Label>"),
+                    Some(l) => write!(f, "Tautology<Name, Value, {}>", l),
+                }
+            }
+        }
+    }
+}
+
+impl Predicate {
+    fn set_label_str(&mut self, label: String) {
+        match self {
+            Predicate::Tautology(opt) => {
+                opt.insert(label);
+            },
+            _ => {}
         }
     }
 }
@@ -51,7 +69,6 @@ pub(in crate) enum BoolPredicate {
     And(Box<BoolPredicate>, Box<BoolPredicate>),
     Or(Box<BoolPredicate>, Box<BoolPredicate>),
     Neg(Box<BoolPredicate>),
-    Tautology,
 }
 
 impl Display for BoolPredicate {
@@ -69,9 +86,20 @@ impl Display for BoolPredicate {
             BoolPredicate::Or(a, b) => {
                 write!(f, "Or<{}, {}>", a, b)
             }
-            BoolPredicate::Tautology => {
-                write!(f, "Tautology<Name, Value, Label>")
-            }
+        }
+    }
+}
+
+impl BoolPredicate {
+    fn set_label_str(&mut self, label: String) {
+        match self {
+            BoolPredicate::Normal(p) => p.set_label_str(label),
+            BoolPredicate::Neg(p) => p.set_label_str(label),
+            BoolPredicate::And(p1, p2) |
+                BoolPredicate::Or(p1, p2) => {
+                    p1.set_label_str(label.clone());
+                    p2.set_label_str(label)
+                }
         }
     }
 }
@@ -219,14 +247,16 @@ impl Display for TypeFormatter<'_> {
                 side_effect,
                 next,
             } => {
-                let (other, param_name, label, pred, effect, next) = (
+                let (other, param_name, label, effect, next) = (
                     self.role(role),
                     self.param_names(label).iter().next().unwrap().clone(),
                     self.label(label),
-                    self.boolpred(predicate),
                     self.effect(side_effect),
                     self.with(next),
                 );
+                let mut predicate = predicate.clone();
+                predicate.set_label_str(label.to_string());
+                let pred = self.boolpred(&mut predicate);
                 match direction {
                     Direction::Send => write!(
                         f,
