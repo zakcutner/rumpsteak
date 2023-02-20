@@ -1,0 +1,10 @@
+(*# RefinementTypes #*)
+
+global protocol PingPong(role A, role B)
+{
+	rec t {
+		Ping(x: int) from A to B;
+		Pong(x: int) from B to A;
+		continue t;
+	}
+}

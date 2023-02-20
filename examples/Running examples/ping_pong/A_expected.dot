@@ -1,0 +1,9 @@
+digraph A {
+  0;
+  2;
+  
+  
+  0 -> 2 [label="B!Ping(x: i32)", ];
+  2 -> 0 [label="B?Pong(x: i32)", ];
+  
+  }
