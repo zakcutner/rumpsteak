@@ -114,8 +114,9 @@ fn session_struct(mut input: ItemStruct, value: Type) -> Result<TokenStream> {
     output.extend(quote! {
         impl #impl_generics ::rumpsteak::FromState<'__r> for #ident #ty_generics #where_clause {
             type Role = __R;
+            type Value = Value;
 
-            fn from_state(state: ::rumpsteak::State<'__r, Self::Role>) -> Self {
+            fn from_state(state: ::rumpsteak::State<'__r, Self::Role, Self::Value>) -> Self {
                 Self { #field_ident: ::rumpsteak::FromState::from_state(state) }
             }
         }
