@@ -17,8 +17,8 @@ gtn = { ">" }
 eq = { "=" }
 comp = { atom ~ (ltn | gtn | eq) ~ atom }
 
-and = { "(" ~ predicate ~ ")" ~ "∧" ~ "(" ~ predicate ~ ")" }
-or = { "(" ~ predicate ~ ")" ~ "∨" ~ "(" ~ predicate ~ ")" }
+and = { "(" ~ predicate ~ ")" ~ ( "∧" | "&&") ~ "(" ~ predicate ~ ")" }
+or = { "(" ~ predicate ~ ")" ~ ( "∨" | "||") ~ "(" ~ predicate ~ ")" }
 neg = { "!" ~ "(" ~ predicate ~ ")" }
 predicate = { comp | neg | or | and }
 
@@ -30,6 +30,6 @@ side_effect = { ident ~ "=" ~ ident ~ ( incr | decr | mult | div ) ~ ident }
 
 param = { ident ~ ":" ~ ident }
 parameters = { (param ~ ",")* ~ param? }
-label = { "\""? ~ ident ~ (send | receive) ~ ident ~ "(" ~ parameters ~ ("{" ~ predicate ~ "}")? ~ ")" ~ ( ":" ~ side_effect)? ~ "\"" }
+label = { "\""? ~ ident ~ (send | receive) ~ ident ~ "(" ~ parameters ~ ("{" ~ predicate ~ "}")? ~ ")" ~ ( ":" ~ side_effect)? ~ "\""? }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }

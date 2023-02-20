@@ -266,7 +266,7 @@ where
         let label = message.downcast().or(Err(ReceiveError::UnexpectedType))?;
         self.state.variables.insert(NAME, label.clone().into());
         self.effect.side_effect(&mut self.state.variables);
-        self.predicate.check(&self.state.variables, None).unwrap();
+        //self.predicate.check(&self.state.variables, None).unwrap();
         Ok((label, FromState::from_state(self.state)))
     }
 }

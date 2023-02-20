@@ -211,7 +211,7 @@ fn generate_definitions(graph: &Graph<'_>) -> Vec<Definition> {
                 direction: weight.direction.unwrap(),
                 role: weight.role.unwrap(),
                 node: node.index(),
-                predicate: BoolPredicate::Tautology,
+                predicate: BoolPredicate::Normal(Predicate::Tautology(None)),
                 side_effect: SideEffect::None,
             };
 

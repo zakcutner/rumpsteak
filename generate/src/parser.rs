@@ -276,7 +276,7 @@ fn check_graph_edges<'a>(graph: &DotGraph<'a, label::Label<'a>>) -> Result<(), (
         }
 
         if graph.name == edge_label.map(|label| label.role) {
-            eprintln!("cannot send to or receive from own role");
+            eprintln!("cannot send to or receive from own role (role {:?})", graph.name);
             return Err(());
         }
     }
@@ -517,12 +517,12 @@ mod label {
                 BoolPredicate::And(pred1, pred2) => {
                     let lhs: BoolPredicate = *pred1;
                     let rhs: BoolPredicate = *pred2;
-                    super::super::BoolPredicate::And(Box::new(lhs.into()), Box::new(rhs.into()))
+                    super::super::BoolPredicate::And(None, Box::new(lhs.into()), Box::new(rhs.into()))
                 }
                 BoolPredicate::Or(pred1, pred2) => {
                     let lhs: BoolPredicate = *pred1;
                     let rhs: BoolPredicate = *pred2;
-                    super::super::BoolPredicate::Or(Box::new(lhs.into()), Box::new(rhs.into()))
+                    super::super::BoolPredicate::Or(None, Box::new(lhs.into()), Box::new(rhs.into()))
                 }
                 BoolPredicate::Neg(pred) => {
                     let inner: BoolPredicate = *pred;

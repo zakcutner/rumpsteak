@@ -66,8 +66,8 @@ impl Predicate {
 #[derive(Clone, Debug)]
 pub(in crate) enum BoolPredicate {
     Normal(Predicate),
-    And(Box<BoolPredicate>, Box<BoolPredicate>),
-    Or(Box<BoolPredicate>, Box<BoolPredicate>),
+    And(Option<String>, Box<BoolPredicate>, Box<BoolPredicate>),
+    Or(Option<String>, Box<BoolPredicate>, Box<BoolPredicate>),
     Neg(Box<BoolPredicate>),
 }
 
@@ -80,11 +80,16 @@ impl Display for BoolPredicate {
             BoolPredicate::Neg(a) => {
                 write!(f, "Neg<{}>", a)
             }
-            BoolPredicate::And(a, b) => {
+            BoolPredicate::And(_l, a, b) => {
                 write!(f, "And<{}, {}>", a, b)
             }
-            BoolPredicate::Or(a, b) => {
-                write!(f, "Or<{}, {}>", a, b)
+            BoolPredicate::Or(l, a, b) => {
+                match l {
+                    Some(l) => 
+                        write!(f, "Or<{}, {}, {}, Name, Value>", l, a, b),
+                    None =>
+                        write!(f, "Or<None, {}, {}, Name, Value>", a, b),
+                }
             }
         }
     }
@@ -95,8 +100,9 @@ impl BoolPredicate {
         match self {
             BoolPredicate::Normal(p) => p.set_label_str(label),
             BoolPredicate::Neg(p) => p.set_label_str(label),
-            BoolPredicate::And(p1, p2) |
-                BoolPredicate::Or(p1, p2) => {
+            BoolPredicate::And(l, p1, p2) |
+                BoolPredicate::Or(l, p1, p2) => {
+                    l.insert(label.clone());
                     p1.set_label_str(label.clone());
                     p2.set_label_str(label)
                 }
