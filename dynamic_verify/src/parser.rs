@@ -32,8 +32,7 @@ pub struct Label<'a> {
     pub(in crate) receiver: char,                   // "C"
     pub(in crate) payload: &'a str,                 // "empty3"
     pub(in crate) parameters: Vec<(char, &'a str)>, // (name, type) ("x", "u32")
-    pub(in crate) refinements: Vec<char>, // ['x']
-
+    pub(in crate) refinements: Vec<char>,           // ['x']
 }
 
 impl<'a> Label<'a> {

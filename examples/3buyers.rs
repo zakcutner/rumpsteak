@@ -18,19 +18,40 @@
 //     }
 // }
 
-#[allow(unused_imports)]
-use ::rumpsteak::{
-    channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
-    Select, Send,
-};
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     executor, try_join,
 };
+#[allow(unused_imports)]
+use ::rumpsteak::{
+    channel::Bidirectional,
+    session,
+    Branch,
+    End,
+    Message,
+    Receive,
+    Role,
+    Roles,
+    Select,
+    Send,
+    effect::{
+        SideEffect,
+        Constant,
+        Incr,
+    },
+    try_session,
+    predicate::{
+        Tautology,
+        LTnVar
+    },
+};
 
+use std::collections::HashMap;
 use std::error::Error;
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
+type Name = char;
+type Value = u32;
 
 #[derive(Roles)]
 #[allow(dead_code)]
@@ -92,51 +113,51 @@ struct Empty1(i32);
 
 struct Empty2(i32);
 
-#[session]
+#[session(Name, Value)]
 type ThreeBuyerC =
-    Receive<S, Empty3, (), (), Receive<A, Empty4, (), (), Select<A, (), (), ThreeBuyerC2>>>;
+    Receive<S, Empty3, Tautology<Name, Value>, Constant<Name, Value>, Receive<A, Empty4, Tautology<Name, Value>, Constant<Name, Value>, Select<A, Tautology<Name, Value>, Constant<Name, Value>, ThreeBuyerC2>>>;
 
-#[session((), ())]
+#[session(Name, Value)]
 enum ThreeBuyerC2 {
-    Quit(Quit, Send<S, Quit, (), (), End<(), ()>>),
+    Quit(Quit, Send<S, Quit, Tautology<Name, Value>, Constant<Name, Value>, End>),
     Valid(
         Valid,
-        Send<S, Valid, (), (), Receive<S, Empty5, (), (), End<(), ()>>>,
+        Send<S, Valid, Tautology<Name, Value>, Constant<Name, Value>, Receive<S, Empty5, Tautology<Name, Value>, Constant<Name, Value>, End>>,
     ),
 }
 
-#[session]
+#[session(Name, Value)]
 type ThreeBuyerS = Receive<
     A,
     Empty1,
-    (),
-    (),
-    Send<A, Empty2, (), (), Send<C, Empty3, (), (), Branch<C, (), (), ThreeBuyerS3>>>,
+    Tautology<Name, Value>, Constant<Name, Value>, 
+    Send<A, Empty2, Tautology<Name, Value>, Constant<Name, Value>, Send<C, Empty3, Tautology<Name, Value>, Constant<Name, Value>, Branch<C, Tautology<Name, Value>, Constant<Name, Value>, ThreeBuyerS3>>>,
 >;
 
-#[session((), ())]
+#[session(Name, Value)]
 enum ThreeBuyerS3 {
-    Valid(Valid, Send<C, Empty5, (), (), End<(), ()>>),
-    Quit(Quit, End<(), ()>),
+    Valid(Valid, Send<C, Empty5, Tautology<Name, Value>, Constant<Name, Value>, End>),
+    Quit(Quit, End),
 }
 
-#[session]
+#[session(Name, Value)]
 type ThreeBuyerA = Send<
     S,
     Empty1,
-    (),
-    (),
-    Receive<S, Empty2, (), (), Send<C, Empty4, (), (), Branch<C, (), (), ThreeBuyerA3>>>,
+    Tautology<Name, Value>, Constant<Name, Value>, 
+    Receive<S, Empty2, Tautology<Name, Value>, Constant<Name, Value>, Send<C, Empty4, Tautology<Name, Value>, Constant<Name, Value>, Branch<C, Tautology<Name, Value>, Constant<Name, Value>, ThreeBuyerA3>>>,
 >;
 
-#[session((), ())]
+#[session(Name, Value)]
 enum ThreeBuyerA3 {
-    Quit(Quit, End<(), ()>),
-    Valid(Valid, End<(), ()>),
+    Quit(Quit, End),
+    Valid(Valid, End),
 }
 
 async fn c(role: &mut C) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: ThreeBuyerC<'_, _>| async {
+    let mut map = HashMap::new();
+
+    try_session(role, map, |s: ThreeBuyerC<'_, _>| async {
         let (Empty3(msg_s), s) = s.receive().await?;
         let (Empty4(msg_a), s) = s.receive().await?;
         if msg_a == msg_s {
@@ -157,7 +178,9 @@ async fn c(role: &mut C) -> Result<(), Box<dyn Error>> {
 }
 
 async fn s(role: &mut S) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: ThreeBuyerS<'_, _>| async {
+    let mut map = HashMap::new();
+
+    try_session(role, map, |s: ThreeBuyerS<'_, _>| async {
         let (Empty1(msg), s) = s.receive().await?;
         let s = s.send(Empty2(msg)).await?;
         let s = s.send(Empty3(msg)).await?;
@@ -173,7 +196,9 @@ async fn s(role: &mut S) -> Result<(), Box<dyn Error>> {
 }
 
 async fn a(role: &mut A) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: ThreeBuyerA<'_, _>| async {
+    let mut map = HashMap::new();
+
+    try_session(role, map, |s: ThreeBuyerA<'_, _>| async {
         let s = s.send(Empty1(42)).await?;
         let (_reply, s) = s.receive().await?;
         let s = s.send(Empty4(42)).await?;

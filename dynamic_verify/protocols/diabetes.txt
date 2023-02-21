@@ -1,0 +1,17 @@
+digraph G {
+  0;
+  2;
+  3;
+  5;
+  6;
+  8;
+  
+  
+  0 -> 2 [label="A!S sensor_reading(x:i32)", ];
+  2 -> 3 [label="A!S date(d:i32)", ];
+  3 -> 5 [label="S!C alarm()", ];
+  3 -> 8 [label="S!C normal()", ];
+  5 -> 6 [label="S!A register_highBP()", ];
+  8 -> 0 [label="S!A normal()", ];
+  
+  }
