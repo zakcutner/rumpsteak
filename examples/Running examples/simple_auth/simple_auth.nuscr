@@ -8,7 +8,7 @@ global protocol Auth(role C, role S)
 		choice at S {
 			Success(r: int { x = p }) from S to C;
 		} or {
-			Failure(r: int { ! (x = p) }) from S to C;
+			Failure(r: int { not (x = p) }) from S to C;
 			RetX(x: int) from S to C;
 			RetRes (r: int) from C to S;
 			continue Login;

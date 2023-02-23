@@ -1,0 +1,1 @@
+Running examples/ping_pong/ping_pong.rs

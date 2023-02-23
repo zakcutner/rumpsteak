@@ -6,7 +6,7 @@ async fn b(role: &mut B) -> Result<(), Box<dyn Error>> {
             // Accept command if both prices are the same
             let s = s.select(ConfirmAlice(msg_s)).await?;
             let s = s.send(ConfirmSeller(msg_s)).await?;
-            let (Empty5(_msg), s) = s.receive().await?;
+            let (Date(_msg), s) = s.receive().await?;
             println!("Accept order (price {})", msg_a);
             Ok(((), s))
         } else {
@@ -25,24 +25,24 @@ async fn s(role: &mut S) -> Result<(), Box<dyn Error>> {
         let s = s.send(QuoteAlice(msg)).await?;
         let s = s.send(QuoteBob(msg)).await?;
         match s.branch().await? {
-            ThreeBuyerS3::ConfirmSeller(msg, s) => {
-                let s = s.send(Date(msg)).await?;
+            ThreeBuyersS3::ConfirmSeller(msg, s) => {
+                let s = s.send(Date(42)).await?;
                 Ok(((), s))
             }
-            ThreeBuyerS3::QuitSeller(_, end) => Ok(((), end)),
+            ThreeBuyersS3::QuitSeller(_, end) => Ok(((), end)),
         }
     })
     .await
 }
 
 async fn a(role: &mut A) -> Result<(), Box<dyn Error>> {
-    try_session(role, Hashmap::new(), |s: ThreeBuyersA<'_, _>| async {
+    try_session(role, HashMap::new(), |s: ThreeBuyersA<'_, _>| async {
         let s = s.send(Request(42)).await?;
         let (_reply, s) = s.receive().await?;
         let s = s.send(ParticipationBob(42)).await?;
         match s.branch().await? {
-            ThreeBuyerA3::ConfirmAlice(_, end) => Ok(((), end)),
-            ThreeBuyerA3::QuitAlice(_, end) => Ok(((), end)),
+            ThreeBuyersA3::ConfirmAlice(_, end) => Ok(((), end)),
+            ThreeBuyersA3::QuitAlice(_, end) => Ok(((), end)),
         }
     })
     .await

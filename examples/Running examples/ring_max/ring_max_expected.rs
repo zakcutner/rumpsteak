@@ -261,10 +261,10 @@ impl From<ProposalF> for Value {
 }
 
 #[session(Name, Value)]
-type RingMaxA = Send<B, 'a', ProposalA, Tautology<Name, Value, ProposalA>, Constant<Name, Value>, Receive<G, 'g', ProposalG, Or<ProposalG, EqualVar::<Value, Label, 'g', 'f'>, GTnVar::<Value, Label, 'g', 'f'>, Name, Value>, Constant<Name, Value>, End>>;
+type RingMaxA = Send<B, 'a', ProposalA, Tautology::<Name, Value, ProposalA>, Constant<Name, Value>, Receive<G, 'g', ProposalG, Or<ProposalG, EqualVar::<Value, Label, 'g', 'f'>, GTnVar::<Value, Label, 'g', 'f'>, Name, Value>, Constant<Name, Value>, End>>;
 
 #[session(Name, Value)]
-type RingMaxB = Receive<A, 'a', ProposalA, Tautology<Name, Value, ProposalA>, Constant<Name, Value>, Send<C, 'b', ProposalB, Or<ProposalB, EqualVar::<Value, Label, 'b', 'a'>, GTnVar::<Value, Label, 'b', 'a'>, Name, Value>, Constant<Name, Value>, End>>;
+type RingMaxB = Receive<A, 'a', ProposalA, Tautology::<Name, Value, ProposalA>, Constant<Name, Value>, Send<C, 'b', ProposalB, Or<ProposalB, EqualVar::<Value, Label, 'b', 'a'>, GTnVar::<Value, Label, 'b', 'a'>, Name, Value>, Constant<Name, Value>, End>>;
 
 #[session(Name, Value)]
 type RingMaxC = Receive<B, 'b', ProposalB, Or<ProposalB, EqualVar::<Value, Label, 'b', 'a'>, GTnVar::<Value, Label, 'b', 'a'>, Name, Value>, Constant<Name, Value>, Send<D, 'c', ProposalC, Or<ProposalC, EqualVar::<Value, Label, 'c', 'b'>, GTnVar::<Value, Label, 'c', 'b'>, Name, Value>, Constant<Name, Value>, End>>;
