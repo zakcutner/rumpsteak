@@ -8,11 +8,11 @@ digraph S {
   8;
   
   
-  0 -> 1 [label="A?empty1(i32)", ];
-  1 -> 2 [label="A!empty2(i32)", ];
-  2 -> 3 [label="C!empty3(i32)", ];
-  3 -> 5 [label="C?quit()", ];
-  3 -> 7 [label="C?valid(i32)", ];
-  7 -> 8 [label="C!empty5(i32)", ];
+  0 -> 1 [label="A?Request(r: i32)", ];
+  1 -> 2 [label="A!QuoteAlice(a: i32)", ];
+  2 -> 3 [label="B!QuoteBob(b: i32)", ];
+  3 -> 5 [label="B?QuitSeller(s: i32)", ];
+  3 -> 7 [label="B?ConfirmSeller(s: i32)", ];
+  7 -> 8 [label="B!Date(d: i32)", ];
   
   }

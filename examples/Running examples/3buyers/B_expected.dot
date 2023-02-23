@@ -1,0 +1,20 @@
+digraph B {
+  0;
+  1;
+  2;
+  4;
+  5;
+  6;
+  8;
+  9;
+  
+  
+  0 -> 1 [label="S?QuoteBob(b: i32)", ];
+  1 -> 2 [label="A?ParticipationBob(p: i32)", ];
+  2 -> 4 [label="A!ConfirmAlice(c: i32)", ];
+  2 -> 8 [label="A!QuitAlice(c: i32)", ];
+  4 -> 5 [label="S!ConfirmSeller(s: i32)", ];
+  5 -> 6 [label="S?Date(d: i32)", ];
+  8 -> 9 [label="S!QuitSeller(s: i32)", ];
+  
+  }
