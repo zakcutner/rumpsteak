@@ -1,14 +1,17 @@
-global protocol Proto(role C, role S)
-{
-	Retry(i32) from S to C;
-	Password(i32) from C to S;
-	choice at S {
-		Success(i32) from S to C;
-	} or {
-		Failure(i32) from S to C;
-		do Proto(C, S);
-	} or {
-		Abort(i32) from S to C;
-	}
+(*# RefinementTypes #*)
 
+global protocol Auth(role C, role S)
+{
+	SetPw(p: int) from C to S;
+	rec Login {
+		Password(x: int) from C to S;
+		choice at S {
+			Success(r: int { x = p }) from S to C;
+		} or {
+			Failure(r: int { ! (x = p) }) from S to C;
+			RetX(x: int) from S to C;
+			RetRes (r: int) from C to S;
+			continue Login;
+		}
+	}
 }
