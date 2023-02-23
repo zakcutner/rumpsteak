@@ -1,0 +1,10 @@
+digraph C {
+  0;
+  1;
+  2;
+  
+  
+  0 -> 1 [label="B?ProposalB(b: i32{(b > a) || (b = a)})", ];
+  1 -> 2 [label="D!ProposalC(c: i32{(c > b) || (c = b)})", ];
+  
+  }

@@ -1,0 +1,12 @@
+(*# RefinementTypes #*)
+
+global protocol RingMax(role A, role B, role C, role D, role E, role F, role G)
+{
+	ProposalA(a: int) from A to B;
+	ProposalB(b: int {(b > a) || (b = a)}) from B to C;
+	ProposalC(c: int {(c > b) || (c = b)}) from C to D;
+	ProposalD(d: int {(d > c) || (d = c)}) from D to E;
+	ProposalE(e: int {(e > d) || (e = d)}) from E to F;
+	ProposalF(f: int {(f > e) || (f = e)}) from F to G;
+	ProposalG(g: int {(g > f) || (g = f)}) from G to A;
+}

@@ -1,0 +1,11 @@
+digraph E {
+  0;
+  1;
+  2;
+  
+  
+  0 -> 1 [label="D?ProposalD(d: i32{(d > c) || (d = c)})",
+          ];
+  1 -> 2 [label="F!ProposalE(e: i32{(e > d) || (e = d)})", ];
+  
+  }
