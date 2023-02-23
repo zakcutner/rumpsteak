@@ -28,24 +28,24 @@ impl Display for Predicate {
                 write!(f, "LTnVar::<Value, Label, '{}', '{}'>", param, value)
             }
             Predicate::LTnConst(param, value) => {
-                write!(f, "LTnConst::<Value, '{}', {}>", param, value)
+                write!(f, "LTnConst::<Label, '{}', {}>", param, value)
             }
             Predicate::GTnVar(param, value) => {
                 write!(f, "GTnVar::<Value, Label, '{}', '{}'>", param, value)
             }
             Predicate::GTnConst(param, value) => {
-                write!(f, "GTnConst::<Value, '{}', {}>", param, value)
+                write!(f, "GTnConst::<Label, '{}', {}>", param, value)
             }
             Predicate::EqualVar(param, value) => {
                 write!(f, "EqualVar::<Value, Label, '{}', '{}'>", param, value)
             }
             Predicate::EqualConst(param, value) => {
-                write!(f, "EqualConst::<Value, '{}', {}>", param, value)
+                write!(f, "EqualConst::<Label, '{}', {}>", param, value)
             }
             Predicate::Tautology(label) => {
                 match label {
-                    None => write!(f, "Tautology<Name, Value, Label>"),
-                    Some(l) => write!(f, "Tautology<Name, Value, {}>", l),
+                    None => write!(f, "Tautology::<Name, Value, Label>"),
+                    Some(l) => write!(f, "Tautology::<Name, Value, {}>", l),
                 }
             }
         }
@@ -68,7 +68,7 @@ pub(in crate) enum BoolPredicate {
     Normal(Predicate),
     And(Option<String>, Box<BoolPredicate>, Box<BoolPredicate>),
     Or(Option<String>, Box<BoolPredicate>, Box<BoolPredicate>),
-    Neg(Box<BoolPredicate>),
+    Neg(Option<String>, Box<BoolPredicate>),
 }
 
 impl Display for BoolPredicate {
@@ -77,8 +77,11 @@ impl Display for BoolPredicate {
             BoolPredicate::Normal(a) => {
                 write!(f, "{}", a)
             }
-            BoolPredicate::Neg(a) => {
-                write!(f, "Neg<{}>", a)
+            BoolPredicate::Neg(l, a) => {
+                match l {
+                Some(l) => write!(f, "Neg::<{}, {}, Name, Value>", l, a),
+                None => write!(f, "Neg::<Label, {}, Name, Value>", a),
+                }
             }
             BoolPredicate::And(_l, a, b) => {
                 write!(f, "And<{}, {}>", a, b)
@@ -88,7 +91,7 @@ impl Display for BoolPredicate {
                     Some(l) => 
                         write!(f, "Or<{}, {}, {}, Name, Value>", l, a, b),
                     None =>
-                        write!(f, "Or<None, {}, {}, Name, Value>", a, b),
+                        write!(f, "Or<Label, {}, {}, Name, Value>", a, b),
                 }
             }
         }
@@ -99,7 +102,10 @@ impl BoolPredicate {
     fn set_label_str(&mut self, label: String) {
         match self {
             BoolPredicate::Normal(p) => p.set_label_str(label),
-            BoolPredicate::Neg(p) => p.set_label_str(label),
+            BoolPredicate::Neg(l, p) => {
+                l.insert(label.clone());
+                p.set_label_str(label)
+            },
             BoolPredicate::And(l, p1, p2) |
                 BoolPredicate::Or(l, p1, p2) => {
                     l.insert(label.clone());

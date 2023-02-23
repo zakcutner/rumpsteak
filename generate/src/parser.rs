@@ -526,7 +526,7 @@ mod label {
                 }
                 BoolPredicate::Neg(pred) => {
                     let inner: BoolPredicate = *pred;
-                    super::super::BoolPredicate::Neg(Box::new(inner.into()))
+                    super::super::BoolPredicate::Neg(None, Box::new(inner.into()))
                 },
                 BoolPredicate::Tautology => super::super::BoolPredicate::Normal(super::super::Predicate::Tautology(None)),
             }
