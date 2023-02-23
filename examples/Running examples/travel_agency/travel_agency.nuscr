@@ -1,0 +1,17 @@
+(*# RefinementTypes #*)
+
+global protocol TravelAgency(role C, role A)
+{
+    Order(o: int) from C to A;
+    Quote(q: int) from A to C;
+    choice at C
+    {
+        Accept(y: int{q < 100}) from C to A;
+        Address(a: int) from C to A;
+        Date(d: int) from A to C;
+    }
+    or
+    {
+        Reject(n: int) from C to A;
+    }
+}

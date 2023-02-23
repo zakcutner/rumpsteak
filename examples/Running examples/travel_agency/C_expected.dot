@@ -1,0 +1,18 @@
+digraph C {
+  0;
+  1;
+  2;
+  4;
+  5;
+  6;
+  8;
+  
+  
+  0 -> 1 [label="A!Order(o: i32)", ];
+  1 -> 2 [label="A?Quote(q: i32)", ];
+  2 -> 4 [label="A!Accept(y: i32{q < 100})", ];
+  2 -> 8 [label="A!Reject(n: i32)", ];
+  4 -> 5 [label="A!Address(a: i32)", ];
+  5 -> 6 [label="A?Date(d: i32)", ];
+  
+  }
