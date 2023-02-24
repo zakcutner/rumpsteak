@@ -1,0 +1,15 @@
+global protocol Auth(role C, role S)
+{
+	SetPw(p: int) from C to S;
+	rec Login {
+		Password(x: int) from C to S;
+		choice at S {
+			Success(r: int) from S to C;
+		} or {
+			Failure(r: int) from S to C;
+			RetX(x: int) from S to C;
+			RetRes (r: int) from C to S;
+			continue Login;
+		}
+	}
+}
