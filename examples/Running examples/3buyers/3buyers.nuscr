@@ -1,0 +1,23 @@
+(* From: Global Progress for Dynamically Interleaved Multiparty Sessions 
+   with Carol removed
+*)
+
+global protocol ThreeBuyers(role A, role B, role S)
+{
+    Request(r: int) from A to S;
+    QuoteAlice(a: int) from S to A;
+    QuoteBob(b: int) from S to B;
+    ParticipationBob(p: int) from A to B;
+
+    choice at B
+    {
+        ConfirmAlice(c: int) from B to A;
+        ConfirmSeller(s: int) from B to S;
+        Date(d: int) from S to B;
+    }
+    or
+    {
+        QuitAlice(c: int) from B to A;
+        QuitSeller(s: int) from B to S;
+    }
+}

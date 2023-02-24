@@ -1,6 +1,16 @@
 #!/bin/sh
 
-GENERATE="$(which rumpsteak-generate || echo "../../../target/debug/rumpsteak-generate")"
+set -x
+
+GENERATE="$(which rumpsteak-generate || if [ -e "../../../target/debug/rumpsteak-generate" ]; then echo "../../../target/debug/rumpsteak-generate"; fi || echo "../../../target/release/rumpsteak-generate")"
+
+SCR2DOT="../../../../scr2dot/_build/default/scr2dot.exe"
+MPST_UNROLL="../../../../mpst_unroll/target/debug/mpst_unroll"
+DYNAMIC_VERIFY="../../../../dynamic_verify/target/debug/parser"
+
+PROTO="ThreeBuyers"
+ENDPOINTS="A B S"
+FILE="3buyers"
 
 failwith() {
 	echo [FAIL] $1 1>&2
@@ -8,30 +18,39 @@ failwith() {
 }
 
 nuscr2dot() {
-	for endpoint in A C S; do
-		nuscr --fsm $endpoint@ThreeBuyers three_buyers.nuscr | sed s/G/$endpoint/ > $endpoint.dot || failwith "Can not generate .dot files (nuscr error)."
+	for endpoint in $ENDPOINTS; do
+		nuscr --fsm $endpoint@$PROTO ${FILE}.nuscr |
+			sed "s/digraph G/digraph $endpoint/" |
+			sed s/int/i32/ |
+			sed 's/<.*>//' > ${endpoint}.dot || failwith "Can not generate .dot files (nuscr error)."
 	done
 }
 
 checkdots() {
-	for endpoint in A C S; do
+	for endpoint in $ENDPOINTS; do
 		cmp $endpoint.dot ${endpoint}_expected.dot || failwith "$endpoint.dot is not identical to what is expected."
 	done
 }
 
 dot2rs() {
-	$GENERATE --name ThreeBuyers C.dot S.dot A.dot > 3buyers.rs || failwith "Can not generate .rs file (rumpsteak-generate error)."
+	DOT="$(echo ${ENDPOINTS}.dot | sed s/\ /.dot\ /g)"
+
+	$GENERATE --name $PROTO $DOT > ${FILE}.rs || failwith "Can not generate .rs file (rumpsteak-generate error)."
 }
 
 checkrs() {
-	cmp 3buyers.rs 3buyers_expected.rs || failwith "oauth.rs is not what is expected."
+	cmp ${FILE}.rs ${FILE}_expected.rs || failwith "${FILE}.rs is not what is expected."
+}
+
+dynamic_verify() {
+	$SCR2DOT ${FILE}.nuscr | $MPST_UNROLL | $DYNAMIC_VERIFY
 }
 
 clean() {
-	for endpoint in A C S; do
+	for endpoint in $ENDPOINTS; do
 		rm $endpoint.dot
 	done
-	rm 3buyers.rs
+	rm ${FILE}.rs
 }
 
 case "$1" in
@@ -41,6 +60,21 @@ case "$1" in
 	"config")
 		echo "$GENERATE"
 		break ;;
+	"dyn_verif")
+		dynamic_verify
+		break ;;
+	"nuscr2dot")
+		nuscr2dot
+		break;;
+	"checkdots")
+		checkdots
+		break;;
+	"dot2rs")
+		dot2rs
+		break;;
+	"checkrs")
+		checkrs
+		break;;
 	*)
 		nuscr2dot
 		checkdots
