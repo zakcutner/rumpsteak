@@ -148,8 +148,6 @@ impl<'a> Tree<'a> {
             labels: context.labels,
         };
 
-        eprintln!("{:#?}", tree);
-
         Ok(tree)
     }
 }

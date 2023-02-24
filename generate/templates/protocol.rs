@@ -1,8 +1,13 @@
-use ::futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use ::futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    executor, try_join
+};
 #[allow(unused_imports)]
 use ::rumpsteak::{
-    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send, 
+    channel::Bidirectional, session, Branch, End, Message, Receive, Role, Roles, Select, Send, try_session
 };
+
+use std::error::Error;
 
 type Channel = Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
 
