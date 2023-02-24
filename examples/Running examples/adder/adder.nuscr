@@ -1,0 +1,17 @@
+(*# RefinementTypes #*)
+
+global protocol Adder(role C, role S) {
+	rec t {
+		choice at C {
+			lhs(x: int) from C to S;
+			rhs(y: int) from C to S;
+			ok(x: int) from S to C;
+
+			ret(y: int) from S to C; (* return value y *)
+
+			continue t;
+		} or {
+			quit(z: int) from C to S;
+		}
+	}
+}

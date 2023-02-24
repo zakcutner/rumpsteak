@@ -1,0 +1,15 @@
+digraph S {
+  0;
+  3;
+  4;
+  5;
+  7;
+  
+  
+  0 -> 3 [label="C?lhs(x: i32)", ];
+  0 -> 7 [label="C?quit(z: i32)", ];
+  3 -> 4 [label="C?rhs(y: i32)", ];
+  4 -> 5 [label="C!ok(x: i32)", ];
+  5 -> 0 [label="C!ret(y: i32)", ];
+  
+  }
