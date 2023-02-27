@@ -1,0 +1,1 @@
+Running examples/travel_agency/travel_agency.rs
