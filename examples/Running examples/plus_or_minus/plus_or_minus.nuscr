@@ -1,0 +1,18 @@
+(*# RefinementTypes #*)
+
+global protocol PlusMinus(role A, role B, role C)
+{
+	Secret(n: int) from A to B;
+	rec Loop {
+		Guess(x: int) from C to B;
+		choice at B {
+			More(x: int) from B to C;
+			continue Loop;
+		} or {
+			Less(x: int) from B to C;
+			continue Loop;
+		} or {
+			Correct(x: int) from B to C;
+		}
+	}
+}
