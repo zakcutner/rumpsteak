@@ -1,0 +1,1 @@
+Running examples/ring_max/ring_max.rs
