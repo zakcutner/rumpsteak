@@ -1,0 +1,7 @@
+(*# RefinementTypes #*)
+
+global protocol Adder(role C, role S) {
+	lhs(x: int) from C to S;
+	rhs(y: int) from C to S;
+	res(r: int) from S to C;
+}

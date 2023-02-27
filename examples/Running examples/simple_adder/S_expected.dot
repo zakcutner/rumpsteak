@@ -1,0 +1,12 @@
+digraph S {
+  0;
+  1;
+  2;
+  3;
+  
+  
+  0 -> 1 [label="C?lhs(x: i32)", ];
+  1 -> 2 [label="C?rhs(y: i32)", ];
+  2 -> 3 [label="C!res(r: i32)", ];
+  
+  }
