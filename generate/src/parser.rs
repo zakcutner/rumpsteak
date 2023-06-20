@@ -4,18 +4,13 @@ use super::{Graph, GraphEdge, GraphNode, Result};
 use indexmap::{IndexMap, IndexSet};
 use std::{
     collections::HashMap,
+    convert::TryFrom,
     error::Error,
     fmt::{self, Display, Formatter},
-    convert::TryFrom,
 };
 
 extern crate dot_parser;
-use dot_parser::ast::{
-    Graph as DotGraph,
-    Stmt,
-    NodeStmt,
-    NodeID,
-};
+use dot_parser::ast::{Graph as DotGraph, NodeID, NodeStmt, Stmt};
 
 struct Context<'a> {
     roles: IndexSet<&'a str>,
@@ -53,7 +48,9 @@ struct Digraph<'a> {
 
 impl<'a> TryFrom<(DotGraph<'a, label::Label<'a>>, &mut Context<'a>)> for Digraph<'a> {
     type Error = ();
-    fn try_from(tuple: (DotGraph<'a, label::Label<'a>>, &mut Context<'a>)) -> Result<Self, Self::Error> {
+    fn try_from(
+        tuple: (DotGraph<'a, label::Label<'a>>, &mut Context<'a>),
+    ) -> Result<Self, Self::Error> {
         let (value, context) = tuple;
         let mut nodes: Vec<Node<'a>> = Vec::new();
         let mut edges: Vec<dot_parser::ast::EdgeStmt<'a, label::Label<'a>>> = Vec::new();
@@ -64,9 +61,9 @@ impl<'a> TryFrom<(DotGraph<'a, label::Label<'a>>, &mut Context<'a>)> for Digraph
 
         for statement in value.stmts {
             match statement {
-                Stmt::NodeStmt(node) => { nodes.push(node.into()) },
-                Stmt::EdgeStmt(edge) => { edges.push(edge) },
-                _ => { /* Ignore AttrStmt and IDEq */ },
+                Stmt::NodeStmt(node) => nodes.push(node.into()),
+                Stmt::EdgeStmt(edge) => edges.push(edge),
+                _ => { /* Ignore AttrStmt and IDEq */ }
             }
         }
 
@@ -98,7 +95,7 @@ impl<'a> TryFrom<(DotGraph<'a, label::Label<'a>>, &mut Context<'a>)> for Digraph
             graph.add_edge(from_index, to_index, edge);
         }
 
-        Ok(Digraph { graph }) 
+        Ok(Digraph { graph })
     }
 }
 
@@ -112,20 +109,20 @@ impl<'a> Tree<'a> {
     pub fn parse(inputs: &'a [String]) -> Result<Self> {
         let mut context = Context::with_capacity(inputs.len());
         let roles = inputs.iter().map(|input| {
-            let dot_graph = 
-                match DotGraph::read_dot(input) {
-                    Ok(graph) => graph.filter_map(|(key, value)| 
-                        if key == "label" {
-                            let label = label::Label::from_str(value).unwrap();
-                            Some(label)
-                        } else {
-                            None
-                        }),
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        panic!();
-                        }
-                };
+            let dot_graph = match DotGraph::read_dot(input) {
+                Ok(graph) => graph.filter_map(|(key, value)| {
+                    if key == "label" {
+                        let label = label::Label::from_str(value).unwrap();
+                        Some(label)
+                    } else {
+                        None
+                    }
+                }),
+                Err(e) => {
+                    eprintln!("{}", e);
+                    panic!();
+                }
+            };
             let role = dot_graph.name.unwrap(); // panic if the graph is not named
             if !context.roles.insert(role) {
                 let message = format!("Duplicate graphs found for role {}", role);
@@ -140,7 +137,10 @@ impl<'a> Tree<'a> {
             .into_iter()
             .map(|(name, dot_graph)| {
                 //TODO: handle error properly if try_from fails
-                Ok((name, Digraph::try_from((dot_graph, &mut context)).unwrap().graph))
+                Ok((
+                    name,
+                    Digraph::try_from((dot_graph, &mut context)).unwrap().graph,
+                ))
             });
 
         let tree = Tree {
@@ -166,7 +166,7 @@ impl Display for StrError {
 impl Error for StrError {}
 
 fn error_msg(message: String) -> Box<dyn Error> {
-    Box::new(StrError{ msg: message })
+    Box::new(StrError { msg: message })
 }
 
 #[derive(Copy, Clone)]
@@ -174,11 +174,15 @@ fn error_msg(message: String) -> Box<dyn Error> {
 enum NodeDirection<'a> {
     Unspecified,
     Send(&'a str),
-    Receive(&'a str)
+    Receive(&'a str),
 }
 
 fn check_graph_edges<'a>(graph: &DotGraph<'a, label::Label<'a>>) -> Result<(), ()> {
-    let mut nodes: IndexMap<&str, NodeDirection> = (&graph.stmts).into_iter().filter_map(|stmt| stmt.get_node_ref()).map(|n| (n.name(), NodeDirection::Unspecified)).collect();
+    let mut nodes: IndexMap<&str, NodeDirection> = (&graph.stmts)
+        .into_iter()
+        .filter_map(|stmt| stmt.get_node_ref())
+        .map(|n| (n.name(), NodeDirection::Unspecified))
+        .collect();
     let mut payload_types: IndexMap<&str, &Vec<(&str, &str)>> = IndexMap::new();
 
     for edge in (&graph.stmts).into_iter().filter_map(|e| e.get_edge_ref()) {
@@ -188,9 +192,17 @@ fn check_graph_edges<'a>(graph: &DotGraph<'a, label::Label<'a>>) -> Result<(), (
             eprintln!("Chaining multiple edges at once is not supported: split the chain into individual edges.");
             return Err(());
         }
-        let edge_label: Option<&label::Label<'a>> = edge.attr.as_ref().map(|attr| attr.flatten_ref().elems.pop()).flatten();
-        let edge_direction_role = edge_label.as_ref().map(|label| (label.direction, label.role));
-        let edge_payload = edge_label.as_ref().map(|label| (label.payload, &label.parameters));
+        let edge_label: Option<&label::Label<'a>> = edge
+            .attr
+            .as_ref()
+            .map(|attr| attr.flatten_ref().elems.pop())
+            .flatten();
+        let edge_direction_role = edge_label
+            .as_ref()
+            .map(|label| (label.direction, label.role));
+        let edge_payload = edge_label
+            .as_ref()
+            .map(|label| (label.payload, &label.parameters));
 
         match edge_payload {
             Some((payload, parameters)) => {
@@ -204,12 +216,12 @@ fn check_graph_edges<'a>(graph: &DotGraph<'a, label::Label<'a>>) -> Result<(), (
                             );
                             return Err(());
                         }
-                    },
+                    }
                     None => {
                         payload_types.insert(payload, parameters);
                     }
                 }
-            },
+            }
             None => {
                 eprintln!("An edge has no payload");
                 return Err(());
@@ -260,7 +272,7 @@ fn check_graph_edges<'a>(graph: &DotGraph<'a, label::Label<'a>>) -> Result<(), (
             None => {
                 eprintln!("An edge has no correct label");
                 return Err(());
-                }
+            }
         }
 
         if graph.name == edge_label.map(|label| label.role) {
@@ -272,17 +284,17 @@ fn check_graph_edges<'a>(graph: &DotGraph<'a, label::Label<'a>>) -> Result<(), (
 }
 
 mod label {
+    use pest::iterators::Pair;
     use pest::Parser;
     use pest_derive::Parser;
-    use pest::iterators::Pair;
     use std::convert::{TryFrom, TryInto};
 
-#[derive(Parser)]
-#[grammar = "parser/label.pest"]
-    pub (in crate) struct LabelParser;
+    #[derive(Parser)]
+    #[grammar = "parser/label.pest"]
+    pub(crate) struct LabelParser;
 
     #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Copy, Clone)]
-    pub (in crate) enum Direction {
+    pub(crate) enum Direction {
         Send,
         Receive,
     }
@@ -309,18 +321,18 @@ mod label {
 
     #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Debug, Clone)]
     pub struct Label<'a> {
-        pub (in crate) role: &'a str,
-        pub (in crate) direction: Direction, 
-        pub (in crate) payload: &'a str,
-        pub (in crate) parameters: Vec<(&'a str, &'a str)>, // (name, type)
+        pub(crate) role: &'a str,
+        pub(crate) direction: Direction,
+        pub(crate) payload: &'a str,
+        pub(crate) parameters: Vec<(&'a str, &'a str)>, // (name, type)
     }
 
     impl<'a> Label<'a> {
-        pub (in crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
+        pub(crate) fn parse(p: Pair<'a, Rule>) -> Result<Self, ()> {
             if let Rule::label = p.as_rule() {
                 let mut inner = p.into_inner();
                 let role = inner.next().unwrap().as_str();
-                let direction = inner.next().unwrap().as_rule().try_into().unwrap(); 
+                let direction = inner.next().unwrap().as_rule().try_into().unwrap();
                 let payload = inner.next().unwrap().as_str();
                 let mut parameters = Vec::new();
                 let params = inner.next();
@@ -335,21 +347,26 @@ mod label {
                         }
                     }
                 }
-                Ok(Label { role, direction, payload, parameters})
+                Ok(Label {
+                    role,
+                    direction,
+                    payload,
+                    parameters,
+                })
             } else {
                 Err(())
             }
         }
 
-        pub (in crate) fn from_str(s: &'a str) -> Result<Self, ()> {
+        pub(crate) fn from_str(s: &'a str) -> Result<Self, ()> {
             let label = LabelParser::parse(Rule::label, s);
             if let Err(e) = &label {
                 println!("{}", e);
-            } 
+            }
             Label::parse(label.unwrap().next().unwrap())
         }
-        
-        pub (in crate) fn fields(self) -> (&'a str, Direction, &'a str, Vec<(&'a str, &'a str)>) {
+
+        pub(crate) fn fields(self) -> (&'a str, Direction, &'a str, Vec<(&'a str, &'a str)>) {
             (self.role, self.direction, self.payload, self.parameters)
         }
     }
