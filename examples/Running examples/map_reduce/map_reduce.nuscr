@@ -1,0 +1,23 @@
+global protocol MapReduce(role Server, role C1, role C2, role C3, role C4)
+{
+	rec Loop {
+		choice at Server {
+			Workload(array: Array) from Server to C1;
+			Workload(array: Array) from Server to C2;
+			Workload(array: Array) from Server to C3;
+			Workload(array: Array) from Server to C4;
+
+			PartialResult(result: u32) from C1 to Server;
+			PartialResult(result: u32) from C2 to Server;
+			PartialResult(result: u32) from C3 to Server;
+			PartialResult(result: u32) from C4 to Server;
+			
+			continue Loop;
+		} or {
+			Terminates from Server to C1;
+			Terminates from Server to C2;
+			Terminates from Server to C3;
+			Terminates from Server to C4;
+		}
+	}
+}
