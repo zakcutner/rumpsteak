@@ -1,0 +1,12 @@
+digraph C {
+  0;
+  2;
+  6;
+  
+  
+  0 -> 2 [label="B!Guess(x: i32)", ];
+  2 -> 0 [label="B?Less(x: i32{x > n})", ];
+  2 -> 0 [label="B?More(x: i32{x < n})", ];
+  2 -> 6 [label="B?Correct(x: i32{x = n})", ];
+  
+  }

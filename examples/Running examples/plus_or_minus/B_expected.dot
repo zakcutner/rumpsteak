@@ -1,0 +1,14 @@
+digraph B {
+  0;
+  1;
+  3;
+  7;
+  
+  
+  0 -> 1 [label="A?Secret(n: i32)", ];
+  1 -> 3 [label="C?Guess(x: i32)", ];
+  3 -> 1 [label="C!Less(x: i32{x > n})", ];
+  3 -> 1 [label="C!More(x: i32{x < n})", ];
+  3 -> 7 [label="C!Correct(x: i32{x = n})", ];
+  
+  }
