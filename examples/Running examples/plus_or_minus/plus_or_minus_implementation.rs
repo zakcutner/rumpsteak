@@ -8,21 +8,40 @@ async fn a(role: &mut A) -> Result<(), Box<dyn Error>> {
 
 async fn b(role: &mut B) -> Result<(), Box<dyn Error>> {
     try_session(role, HashMap::new(), |s: PlusMinusB<'_, _>| async {
-        let (Secret(n), s) = s.receive().await?;
-        let (Guess(x), s) = s.receive().await?;
-        let s = s.select(Correct(x)).await?;
-        return Ok(((), s))
+        let (Secret(n), mut s) = s.receive().await?;
+
+	loop {
+		let (Guess(x), s1) = s.receive().await?;
+		if n > x {
+			s = s1.select(More(x)).await?;
+		} else if n < x {
+			s = s1.select(Less(x)).await?;
+		} else {
+			let s = s1.select(Correct(x)).await?;
+			return Ok(((), s))
+		}
+	}
     })
     .await
 }
 
 async fn c(role: &mut C) -> Result<(), Box<dyn Error>> {
     try_session(role, HashMap::new(), |s: PlusMinusC<'_, _>| async {
-        let s = s.send(Guess(10)).await?;
-        match s.branch().await? {
-            PlusMinusC2::Correct(Correct(_), s) => return Ok(((), s)),
-            _ => panic!(),
-        }
+	let mut min = 0;
+	let mut max = 10000000; // both included
+	let mut s = s;
+	loop {
+		let attempt = min + ((max - min) / 2);
+		let s1 = s.send(Guess(attempt)).await?;
+		match s1.branch().await? {
+		PlusMinusC2::Correct(Correct(_), s_end) => {
+			println!("Final guess {}", attempt);
+			return Ok(((), s_end))
+		},
+		PlusMinusC2::Less(_, s_cont) => { s = s_cont; max = attempt - 1; },
+		PlusMinusC2::More(_, s_cont) => { s = s_cont; min = attempt + 1; },
+		}
+	}
     })
     .await
 }
