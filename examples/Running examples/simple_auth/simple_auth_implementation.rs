@@ -1,17 +1,17 @@
 async fn C(role: &mut C) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: AuthC<'_, _>| async {
-        let mut s = s.send(SetPw(10)).await?;
+        let mut s = s.send(SetPw(10000000)).await?;
         let mut cur_attempt = 0;
         loop {
             let s_send = s.send(Password(cur_attempt)).await?;
             cur_attempt += 1;
             match s_send.branch().await? {
                 AuthC3::Success(_, s_bra) => {
-                    println!("Success");
+                    println!("Success ({} attempts)", cur_attempt);
                     return Ok(((), s_bra));
                 }
                 AuthC3::Failure(_, s_bra) => {
-                    println!("Failure");
+                    //println!("Failure");
                     let (_, s_retres) = s_bra.receive().await?;
                     s = s_retres.send(RetRes(0)).await?;
                 }
