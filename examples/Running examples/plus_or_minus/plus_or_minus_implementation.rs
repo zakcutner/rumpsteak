@@ -27,11 +27,11 @@ async fn b(role: &mut B) -> Result<(), Box<dyn Error>> {
 
 async fn c(role: &mut C) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: PlusMinusC<'_, _>| async {
-	let mut min = 0;
-	let mut max = 10000000; // both included
+	let mut min = i32::MIN;
+	let mut max = i32::MAX; // both included
 	let mut s = s;
 	loop {
-		let attempt = min + ((max - min) / 2);
+		let attempt = min/2 + max/2;
 		let s1 = s.send(Guess(attempt)).await?;
 		match s1.branch().await? {
 		PlusMinusC2::Correct(Correct(_), s_end) => {
