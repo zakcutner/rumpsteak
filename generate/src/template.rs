@@ -12,35 +12,53 @@ pub(crate) struct Route(pub usize);
 
 #[derive(Clone, Debug)]
 pub(crate) enum Predicate {
-    LTnVar(String, String),
-    LTnConst(String, String),
-    GTnVar(String, String),
-    GTnConst(String, String),
-    EqualVar(String, String),
-    EqualConst(String, String),
+    LTnVar(String, String, Option<String>),
+    LTnConst(String, String, Option<String>),
+    GTnVar(String, String, Option<String>),
+    GTnConst(String, String, Option<String>),
+    EqualVar(String, String, Option<String>),
+    EqualConst(String, String, Option<String>),
     Tautology(Option<String>),
 }
 
 impl Display for Predicate {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Predicate::LTnVar(param, value) => {
-                write!(f, "LTnVar::<Value, Label, '{}', '{}'>", param, value)
+            Predicate::LTnVar(param, value, label) => {
+		match label {
+			None => write!(f, "LTnVar::<Value, Label, '{}', '{}'>", param, value),
+			Some(l) => write!(f, "LTnVar::<Value, {}, '{}', '{}'>", l, param, value),
+		}
             }
-            Predicate::LTnConst(param, value) => {
-                write!(f, "LTnConst::<Label, '{}', {}>", param, value)
+            Predicate::LTnConst(param, value, label) => {
+		match label {
+			None => write!(f, "LTnConst::<Label, '{}', {}>", param, value),
+			Some(l) => write!(f, "LTnConst::<{}, '{}', {}>", l, param, value),
+		}
             }
-            Predicate::GTnVar(param, value) => {
-                write!(f, "GTnVar::<Value, Label, '{}', '{}'>", param, value)
+            Predicate::GTnVar(param, value, label) => {
+		match label {
+			None => write!(f, "GTnVar::<Value, Label, '{}', '{}'>", param, value),
+			Some(l) => write!(f, "GTnVar::<Value, {}, '{}', '{}'>", l, param, value),
+		}
             }
-            Predicate::GTnConst(param, value) => {
-                write!(f, "GTnConst::<Label, '{}', {}>", param, value)
+            Predicate::GTnConst(param, value, label) => {
+		match label {
+			None => write!(f, "GTnConst::<Label, '{}', {}>", param, value),
+			Some(l) => write!(f, "GTnConst::<{}, '{}', {}>", l, param, value),
+		}
             }
-            Predicate::EqualVar(param, value) => {
-                write!(f, "EqualVar::<Value, Label, '{}', '{}'>", param, value)
+            Predicate::EqualVar(param, value, label) => {
+		match label {
+			None => write!(f, "EqualVar::<Value, Label, '{}', '{}'>", param, value),
+			Some(l) => write!(f, "EqualVar::<Value, {}, '{}', '{}'>", l, param, value),
+		}
             }
-            Predicate::EqualConst(param, value) => {
-                write!(f, "EqualConst::<Label, '{}', {}>", param, value)
+            Predicate::EqualConst(param, value, label) => {
+		match label {
+			None => write!(f, "EqualConst::<Label, '{}', {}>", param, value),
+			Some(l) => write!(f, "EqualConst::<{}, '{}', {}>", l, param, value),
+		}
             }
             Predicate::Tautology(label) => {
                 match label {
@@ -55,10 +73,15 @@ impl Display for Predicate {
 impl Predicate {
     fn set_label_str(&mut self, label: String) {
         match self {
+	    Predicate::LTnVar(_, _, opt) |
+	    Predicate::LTnConst(_, _, opt) |
+	    Predicate::GTnVar(_, _, opt) |
+	    Predicate::GTnConst(_, _, opt) |
+	    Predicate::EqualVar(_, _, opt) |
+	    Predicate::EqualConst(_, _, opt) |
             Predicate::Tautology(opt) => {
                 opt.insert(label);
             },
-            _ => {}
         }
     }
 }

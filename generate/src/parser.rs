@@ -358,10 +358,10 @@ mod label {
                         Atom::Var(a_name) => {
                             match b {
                                 Atom::Var(b_name) => {
-                                    super::super::Predicate::LTnVar(a_name, b_name)
+                                    super::super::Predicate::LTnVar(a_name, b_name, None)
                                 }
                                 Atom::Const(val) => {
-                                    super::super::Predicate::LTnConst(a_name, val)
+                                    super::super::Predicate::LTnConst(a_name, val, None)
                                 }
                             }
                         }
@@ -375,10 +375,10 @@ mod label {
                         Atom::Var(a_name) => {
                             match b {
                                 Atom::Var(b_name) => {
-                                    super::super::Predicate::GTnVar(a_name, b_name)
+                                    super::super::Predicate::GTnVar(a_name, b_name, None)
                                 }
                                 Atom::Const(val) => {
-                                    super::super::Predicate::GTnConst(a_name, val)
+                                    super::super::Predicate::GTnConst(a_name, val, None)
                                 }
                             }
                         }
@@ -392,10 +392,10 @@ mod label {
                         Atom::Var(a_name) => {
                             match b {
                                 Atom::Var(b_name) => {
-                                    super::super::Predicate::EqualVar(a_name, b_name)
+                                    super::super::Predicate::EqualVar(a_name, b_name, None)
                                 }
                                 Atom::Const(val) => {
-                                    super::super::Predicate::EqualConst(a_name, val)
+                                    super::super::Predicate::EqualConst(a_name, val, None)
                                 }
                             }
                         }
