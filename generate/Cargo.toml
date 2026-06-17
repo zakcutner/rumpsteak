@@ -25,4 +25,5 @@ indexmap = "1.6"
 pest = "2.1"
 pest_derive = "2.1"
 petgraph = "0.5"
-dot-parser = "*"
+dot-parser = "0.1.3"
+memchr = "2.4" # <-- Added to force memchr to a version >= 2.4.0
